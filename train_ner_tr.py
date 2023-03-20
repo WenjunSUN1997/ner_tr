@@ -42,7 +42,6 @@ def train(lang, max_len_words, max_len_tokens, tokenizer_name, index_out,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            break
 
         loss_epoch = sum(loss_all) / len(loss_all)
         print(loss_epoch)
