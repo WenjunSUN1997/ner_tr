@@ -17,14 +17,10 @@ def validate(dataloader, model, ann_type, index_out, num_ner):
         loss_all.append(loss.item())
         prediction = ouput['path']
         label = data['label_'+ann_type]
-        mask = data['crf_mask']
         b_s = len(label)
         for b_s_index in range(b_s):
             prediction_cell = prediction[b_s_index]
-            label_cell = torch.tensor([label[b_s_index][i]
-                                       for i in range(len(label[b_s_index]))
-                                       if mask[b_s_index][i]])
-            label_cell = label_cell.tolist()
+            label_cell = label[b_s_index].tolist()
             p_all.append(precision_score(y_true=label_cell, y_pred=prediction_cell,
                                          average='macro', labels=labels_to_cal))
             r_all.append(recall_score(y_true=label_cell, y_pred=prediction_cell,

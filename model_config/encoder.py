@@ -10,7 +10,7 @@ class NerTrEncoder(torch.nn.Module):
                                                    num_layers=2)
         self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
 
-    def forward(self, bert_future, attention_mask):
+    def forward(self, bert_future):
         semantic = self.normalize(bert_future)
-        semantic = self.encoder(semantic, src_key_padding_mask=attention_mask)
+        semantic = self.encoder(semantic)
         return semantic

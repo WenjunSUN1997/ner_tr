@@ -18,11 +18,10 @@ class NerTrDecoder(torch.nn.Module):
         obj_query_embedding_batched = obj_query_embedding.repeat(batch_size, 1, 1)
         return obj_query_embedding_batched.to(self.device)
 
-    def forward_query_ner(self, semantic, mask):
+    def forward_query_ner(self, semantic):
         obj_query_embedding_batched = self.get_obj_query_embedding(semantic.shape[0])
         query_result = self.decoder(memory=semantic,
-                                    tgt=obj_query_embedding_batched,
-                                    memory_key_padding_mask=mask)
+                                    tgt=obj_query_embedding_batched)
         return query_result
 
     def get_cos_sim(self, query_result, text_embedding):
@@ -31,7 +30,7 @@ class NerTrDecoder(torch.nn.Module):
                                           dim=-1)
         return cos_sim
 
-    def forward(self, semantic, mask):
-        query_result = self.forward_query_ner(semantic, mask)
+    def forward(self, semantic):
+        query_result = self.forward_query_ner(semantic)
         cos_sim = self.get_cos_sim(query_result, semantic)
         return query_result, cos_sim

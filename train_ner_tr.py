@@ -7,19 +7,21 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 from model_components.validator_ner_tr import validate
 
-def train(lang, max_len_words, max_len_tokens, tokenizer_name, index_out,
-          bert_model_name, num_ner, ann_type, sim_dim, device, batch_size):
+def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
+          bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment):
     LR = 1e-5
     epoch = 10000
 
     dataloader_train = get_dataloader(lang=lang, goal='train',
-                                      max_len_words=max_len_words,
+                                      window_len=window_len,
+                                      step_len=step_len,
                                       max_len_tokens=max_len_tokens,
                                       tokenizer_name=tokenizer_name,
                                       batch_size=batch_size,
                                       device=device)
     dataloader_test = get_dataloader(lang=lang, goal='test',
-                                      max_len_words=max_len_words,
+                                     window_len=window_len,
+                                     step_len=window_len,
                                       max_len_tokens=max_len_tokens,
                                       tokenizer_name=tokenizer_name,
                                      batch_size=batch_size,
@@ -27,7 +29,9 @@ def train(lang, max_len_words, max_len_tokens, tokenizer_name, index_out,
     config = BertConfig.from_pretrained(bert_model_name)
     config.max_position_embeddings = max_len_tokens
     bert_model = BertModel.from_pretrained(bert_model_name, config=config)
-    ner_model = NerTr(bert_model, sim_dim, max_len_words, num_ner, ann_type, device)
+    ner_model = NerTr(bert_model=bert_model, sim_dim=sim_dim,
+                      num_ner=num_ner, ann_type=ann_type, device=device,
+                      alignment=alignment)
     ner_model.to(device)
     ner_model.train()
     optimizer = torch.optim.Adam(params=ner_model.parameters(), lr=LR)
@@ -53,22 +57,27 @@ def train(lang, max_len_words, max_len_tokens, tokenizer_name, index_out,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", default='fre')
-    parser.add_argument("--max_len_words", default=618)
-    parser.add_argument("--max_len_tokens", default=1000)
+    parser.add_argument("--window_len", default=10)
+    parser.add_argument("--step_len", default=5)
+    parser.add_argument("--max_len_tokens", default=200)
     parser.add_argument("--tokenizer_name", default='camembert-base')
     parser.add_argument("--bert_model_name", default='camembert-base')
     parser.add_argument("--num_ner", default=10)
+    parser.add_argument("--alignment", default='flow', choices=['avg', 'flow',
+                                                                'max', 'first'])
     parser.add_argument("--ann_type", default='croase')
     parser.add_argument("--sim_dim", default=768)
     parser.add_argument("--device", default='cuda:0')
-    parser.add_argument("--batch_size", default=2)
+    parser.add_argument("--batch_size", default=8)
     parser.add_argument("--index_out", default=0)
     args = parser.parse_args()
     print(args)
+    alignment = args.alignment
     lang = args.lang
     index_out = int(args.index_out)
     batch_size = int(args.batch_size)
-    max_len_words = int(args.max_len_words)
+    window_len = int(args.window_len)
+    step_len = int(args.step_len)
     max_len_tokens = int(args.max_len_tokens)
     tokenizer_name = args.tokenizer_name
     bert_model_name =args.bert_model_name
@@ -76,7 +85,16 @@ if __name__ == "__main__":
     ann_type = args.ann_type
     sim_dim = int(args.sim_dim)
     device = args.device
-    train(lang=lang, max_len_tokens=max_len_tokens, max_len_words=max_len_words,
-          tokenizer_name=tokenizer_name, bert_model_name=bert_model_name,
-          num_ner=num_ner, ann_type=ann_type, sim_dim=sim_dim, device=device,
-          batch_size=batch_size, index_out=index_out)
+    train(lang=lang,
+          window_len=window_len,
+          step_len=step_len,
+          max_len_tokens=max_len_tokens,
+          tokenizer_name=tokenizer_name,
+          index_out=index_out,
+          bert_model_name=bert_model_name,
+          num_ner=num_ner,
+          ann_type=ann_type,
+          sim_dim=sim_dim,
+          device=device,
+          batch_size=batch_size,
+          alignment=alignment)

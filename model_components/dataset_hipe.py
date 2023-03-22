@@ -8,7 +8,7 @@ from model_config.ner_tr import NerTr
 
 class TextDataset(torch.utils.data.Dataset):
     def __init__(self, csv, max_len_words, device,
-                 max_len_tokens=1000, tokenizer_name='camembert-base',
+                 max_len_tokens=200, tokenizer_name='camembert-base',
                  ):
         self.csv = csv
         self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
@@ -49,12 +49,12 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained('camembert-base')
     max = 0
     index = 0
-    csv = pd.read_csv('../data/train_fr.csv')
+    csv = pd.read_csv('../data/train_fr_bulk.csv')
     config = BertConfig.from_pretrained('camembert-base')
     config.max_position_embeddings = 1000
     bert = BertModel.from_pretrained('camembert-base', config=config)
     model = NerTr(bert_model=bert, sim_dim=768, max_len_words=618,
-                  num_ner=10, ann_type='croase')
+                  num_ner=10, ann_type='croase', device='cuda:0')
 
     dataset =TextDataset(csv, max_len_words=618, device='cuda:0')
 
