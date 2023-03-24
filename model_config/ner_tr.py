@@ -1,7 +1,7 @@
 import torch
 from model_config.encoder import NerTrEncoder
 from model_config.decoder import NerTrDecoder
-from TorchCRF import CRF
+from torchcrf import CRF
 from fastNLP import modules
 
 class NerTr(torch.nn.Module):
