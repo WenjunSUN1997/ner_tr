@@ -2,7 +2,7 @@ import torch
 from torch.utils.data.dataloader import DataLoader
 from model_components.dataset_hipe import TextDataset
 import pandas as pd
-from transformers import BertModel, BertConfig
+from transformers import BertModel, LlamaTokenizer, AutoTokenizer
 from tqdm import tqdm
 
 def data_preprocess(data, bert, max_len_token=618):
@@ -32,11 +32,14 @@ def data_preprocess(data, bert, max_len_token=618):
         bert_avg.append(torch.nn.functional.pad(stack, padding))
 
 if __name__ == "__main__":
-    config = BertConfig.from_pretrained('camembert-base')
-    config.max_position_embeddings = 1000
-    bert = BertModel.from_pretrained('camembert-base', config=config)
-    csv = pd.read_csv('../data/test_fr.csv')
-    dataset = TextDataset(csv, max_len_tokens=618)
-    dataloader = DataLoader(dataset, batch_size=4)
-    for data in tqdm(dataloader):
-        data_preprocess(data, bert=bert)
+    model = BertModel.from_pretrained('shalomma/llama-7b-embeddings')
+    tokenizer = LlamaTokenizer.from_pretrained('shalomma/llama-7b-embeddings', torch_dtype=torch.float16)
+    tokenizer.add_special_tokens({'pad_token': 'a'})
+    text = 'bon jour'
+    c = tokenizer([text]*4, max_length=256,
+                                             truncation=True,
+                                             padding='max_length',
+                                             return_tensors='pt')
+    o = model(input_ids=c['input_ids'], attention_mask=c['attention_mask'])
+
+    print(c)

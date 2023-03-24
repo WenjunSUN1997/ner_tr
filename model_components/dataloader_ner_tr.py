@@ -4,7 +4,9 @@ import pandas as pd
 
 def get_dataloader(lang, goal, window_len, step_len, max_len_tokens,
                    tokenizer_name, batch_size, device):
-    file_path_dict = {'fre':{'train':'data/train_fr.csv', 'test':'data/test_fr.csv'}}
+    file_path_dict = {'fre':{'train':'data/train_fr.csv',
+                             'test':'data/test_fr.csv',
+                             'dev':'data/dev_fr.csv'}}
     csv = pd.read_csv(file_path_dict[lang][goal])
 
     dataset = TextDatasetBulk(csv=csv,

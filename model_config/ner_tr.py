@@ -2,6 +2,7 @@ import torch
 from model_config.encoder import NerTrEncoder
 from model_config.decoder import NerTrDecoder
 from TorchCRF import CRF
+from fastNLP import modules
 
 class NerTr(torch.nn.Module):
     def __init__(self, bert_model, sim_dim, num_ner, ann_type, device, alignment,

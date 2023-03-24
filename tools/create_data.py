@@ -10,21 +10,17 @@ from datasets import Dataset
 def get_label():
     label_set = df['NE-COARSE-LIT'].unique()
     # define the label mapping for NER
-    label_list = label_set.tolist()
-    label_list.append('_')
+    label_list = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-HumanProd', 'I-HumanProd']
     label_num = len(label_list)
     labels = ClassLabel(num_classes=label_num, names=label_list)
     return labels, label_num
 
 def get_label_fine():
     label_set_fin = df['NE-FINE-LIT'].unique()
-    label_set = df['NE-COARSE-LIT'].unique()
-    # define the label mapping for NER
-    label_list = label_set.tolist()
-    # define the label mapping for NER
-    label_list_fin = label_set_fin.tolist()
-    label_list_fin = list(set(label_list+label_list_fin))
-    label_list_fin.append('_')
+    label_list_fin = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG',
+                      'B-LOC', 'I-LOC', 'B-HumanProd', 'I-HumanProd',
+                      'B-PER.author', 'I-PER.author']
+
     label_num_fin = len(label_list_fin)
     labels_fin = ClassLabel(num_classes=label_num_fin, names=label_list_fin)
     return labels_fin, label_num_fin
@@ -73,7 +69,6 @@ def create_huggingface_file(dataframe):
     return hug_out
 
 def create_huggingface_file_fine(dataframe):
-    #creating dataset in json
     hug_out = []
     idx = 0
     items = {'id': idx,'words':[ ], 'ner_fin': [ ]}
@@ -95,20 +90,13 @@ def create_huggingface_file_fine(dataframe):
             idx += 1
             items = {'id': idx,'words':[ ], 'ner_fin': [ ]}
             hug_out.append(items)
-    #filter hug_out out, delete items which has len(words) > 380
-    #hug_out = filter(lambda x: len(x['words']) < 380, hug_out)
-    #json to df
+
     hug_out = pd.DataFrame(hug_out)
-
-    # delete all sentences that are too long
-    #hug_out = hug_out[hug_out['words'].map(len) < 512] #why does not work? QA
-
-    ### convert to Huggingface dataset
     hug_out = Dataset(pa.Table.from_pandas(hug_out))
 
     return hug_out
 
-path = '../data/HIPE-2022-v2.1-newseye-test-fr.tsv'
+path = '../data/HIPE-2022-v2.1-newseye-train-fr.tsv'
 df = pd.read_csv(path, sep='\t', skip_blank_lines=False, engine='python', quoting=3)
 df = simple_preprocess(df)
 print(df)
@@ -125,5 +113,5 @@ ner_fine = [v['ner_fin'] for v in data_fine ]
 # ner_fin = [v['ner_fin'] for v in x ]
 dict_result = {'words': words, 'ner_c':ner_croase, 'ner_f':ner_fine}
 data = pd.DataFrame(dict_result)
-data.to_csv('../data/test_fr.csv')
+data.to_csv('../data/train_fr.csv')
 print(len(data))

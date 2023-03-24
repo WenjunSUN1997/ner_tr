@@ -10,10 +10,17 @@ from model_components.validator_ner_tr import validate
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
           concatenate):
-    LR = 1e-5
+    LR = 1e-4
     epoch = 10000
 
     dataloader_train = get_dataloader(lang=lang, goal='train',
+                                      window_len=window_len,
+                                      step_len=step_len,
+                                      max_len_tokens=max_len_tokens,
+                                      tokenizer_name=tokenizer_name,
+                                      batch_size=batch_size,
+                                      device=device)
+    dataloader_dev = get_dataloader(lang=lang, goal='dev',
                                       window_len=window_len,
                                       step_len=step_len,
                                       max_len_tokens=max_len_tokens,
@@ -27,9 +34,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                       tokenizer_name=tokenizer_name,
                                      batch_size=batch_size,
                                      device=device)
-    config = BertConfig.from_pretrained(bert_model_name)
-    config.max_position_embeddings = max_len_tokens
-    bert_model = BertModel.from_pretrained(bert_model_name, config=config)
+    bert_model = BertModel.from_pretrained(bert_model_name)
     ner_model = NerTr(bert_model=bert_model, sim_dim=sim_dim,
                       num_ner=num_ner, ann_type=ann_type, device=device,
                       alignment=alignment, concatenate=concatenate)
@@ -40,28 +45,34 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                   factor=0.5, patience=1, verbose=True)
     for epoch_num in range(epoch):
         loss_all = []
-        for data in tqdm(dataloader_train):
+        for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
             output = ner_model(data)
             loss = output['loss']
             print(loss)
-            # print(data['label_croase'])
-            # print(output['path'])
             loss_all.append(loss.item())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            if (step+1) % 2000 == 0:
+                loss_epoch = sum(loss_all) / len(loss_all)
+                # print(loss_epoch)
+                loss_all = []
+                print('dev:')
+                loss_dev = validate(model=ner_model,
+                         dataloader=dataloader_dev, num_ner=num_ner,
+                         ann_type=ann_type, index_out=index_out)
+                print('del loss', loss_dev)
 
-        loss_epoch = sum(loss_all) / len(loss_all)
-        print(loss_epoch)
         loss_val = validate(model=ner_model,
                             dataloader=dataloader_test, num_ner=num_ner,
                             ann_type=ann_type, index_out=index_out)
         scheduler.step(loss_val)
+        print(loss_val)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", default='fre')
-    parser.add_argument("--window_len", default=10)
+    parser.add_argument("--window_len", default=30)
     parser.add_argument("--step_len", default=5)
     parser.add_argument("--max_len_tokens", default=200)
     parser.add_argument("--tokenizer_name", default='camembert-base')
@@ -69,7 +80,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_ner", default=9)
     parser.add_argument("--alignment", default='flow', choices=['avg', 'flow',
                                                                 'max', 'first'])
-    parser.add_argument("--concatenate", default='flow', choices=['add', 'con'])
+    parser.add_argument("--concatenate", default='add', choices=['add', 'con'])
     parser.add_argument("--ann_type", default='croase')
     parser.add_argument("--sim_dim", default=768)
     parser.add_argument("--device", default='cuda:0')
