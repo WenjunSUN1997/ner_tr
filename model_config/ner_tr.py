@@ -1,8 +1,8 @@
 import torch
 from model_config.encoder import NerTrEncoder
 from model_config.decoder import NerTrDecoder
-# from TorchCRF import CRF
-from fastNLP.models.torch.sequence_labeling import ConditionalRandomField
+from TorchCRF import CRF
+from fastNLP.modules import ConditionalRandomField
 
 class NerTr(torch.nn.Module):
     def __init__(self, bert_model, sim_dim, num_ner, ann_type, device, alignment,
@@ -17,18 +17,18 @@ class NerTr(torch.nn.Module):
         self.device = device
         self.concatenate = concatenate
         self.ann_type = ann_type
-        self.bert_model = bert_model
         self.sim_dim = sim_dim
         self.alignment = alignment
 
+        self.bert_model = bert_model
         self.encoder = NerTrEncoder(sim_dim=sim_dim)
         self.decoder = NerTrDecoder(num_ner=num_ner, sim_dim=sim_dim, device=self.device)
         self.linear_add = torch.nn.Linear(in_features=sim_dim, out_features=num_ner)
         self.linear_con = torch.nn.Linear(in_features=sim_dim * 2, out_features=num_ner)
-        # self.crf = CRF(num_ner, batch_first=True)
         self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
-        self.crf = ConditionalRandomField(num_tags=num_ner,
-                                          include_start_end_trans=True)
+        self.crf = CRF(num_ner, batch_first=True)
+        # self.crf = ConditionalRandomField(num_tags=num_ner,
+        #                                   include_start_end_trans=True)
         self.activation = torch.nn.ReLU()
         self.normalize_embedding_with_prob_query = \
             torch.nn.LayerNorm(normalized_shape=sim_dim*2)
@@ -42,20 +42,20 @@ class NerTr(torch.nn.Module):
             bert_feature = self.get_bert_feature_avg(data)
         elif self.alignment == 'first':
             bert_feature = self.get_bert_feature_first(data)
+        elif self.alignment == 'max':
+            bert_feature = self.get_bert_feature_max(data)
         else:
             bert_feature = self.bert_model(input_ids=data['input_ids'],
                                            attention_mask=data['attention_mask_bert'])
             bert_feature = bert_feature['last_hidden_state']
         #output_encoder: [b_s, max_num_token, sim_dim]
         output_encoder = self.encoder(bert_feature)
-        output_encoder_normalized = self.normalize(output_encoder)
         #decoder_embedding:[b_s, num_kind_of_ner, sim_dim], the embedding of quert
         #cos_sim: [b_s, max_num_token, num_kind_of_ner],
         #the cos_sim between output_encoder and decoder_embedding, e.g. the similarity of
         #tokens and query embedding
-        decoder_embedding, cos_sim = self.decoder(output_encoder_normalized)
+        decoder_embedding, cos_sim = self.decoder(output_encoder)
         #transform cos_sim into prob
-        decoder_embedding = self.normalize(decoder_embedding)
         cos_sim_prob = torch.softmax(cos_sim, dim=-1)
         prob_query = self.prob_times_query(cos_sim, decoder_embedding)
         # prob_query = self.prob_times_query(cos_sim_prob, decoder_embedding)
@@ -63,22 +63,28 @@ class NerTr(torch.nn.Module):
             embedding_with_prob_query = output_encoder + prob_query
             embedding_with_prob_query = self.normalize(embedding_with_prob_query)
             embedding_with_prob_query = self.activation(embedding_with_prob_query)
-            ner_prob = torch.softmax(self.linear_add(embedding_with_prob_query), dim=2)
+            ner_prob = self.linear_add(embedding_with_prob_query)
         elif self.concatenate == 'con':
             embedding_with_prob_query = torch.cat((output_encoder, prob_query), dim=2)
             embedding_with_prob_query = self.normalize_embedding_with_prob_query(
                 embedding_with_prob_query)
             embedding_with_prob_query = self.activation(embedding_with_prob_query)
-            ner_prob = torch.softmax(self.linear_con(embedding_with_prob_query), dim=2)
+            ner_prob = self.linear_con(embedding_with_prob_query)
 
+        ner_prob = torch.log_softmax(ner_prob, dim=-1)
         if self.alignment == 'flow':
             ner_prob = self.post_process_flow(cos_sim_prob, data)
 
-        crf_loss = self.crf(ner_prob, data['label_'+self.ann_type],
-                            mask=data['label_'+self.ann_type].ne(0))
-        crf_loss = torch.sum(crf_loss, dim=0)
-        path = self.crf.viterbi_decode(ner_prob, mask=data['label_'+self.ann_type].ne(-1))[0]
-        return {'loss': crf_loss,
+        # mask = torch.ones(data['label_'+self.ann_type].shape, dtype=torch.bool)
+        # crf_loss = self.crf(ner_prob, data['label_'+self.ann_type],
+        #                     mask=mask.to(self.device))
+        # crf_loss = torch.sum(crf_loss, dim=0)
+        # path = self.crf.viterbi_decode(ner_prob, mask=mask.to(self.device))[0]
+        # return {'loss': crf_loss,
+        #         'path': path}
+        crf_loss = self.crf(ner_prob, data['label_' + self.ann_type], reduction='mean')
+        path = self.crf.decode(ner_prob)
+        return {'loss': -1 * crf_loss,
                 'path': path}
 
     def prob_times_query(self, cos_sim_prob, decoder_embedding):
@@ -92,8 +98,10 @@ class NerTr(torch.nn.Module):
                     result_per_row[y] = \
                         cos_sim_prob[b_s_index, prob_row_index, y] \
                         * decoder_embedding[b_s_index, y, :]
+                # result[b_s_index, prob_row_index, :] = \
+                #     torch.sum(result_per_row, dim=0, keepdim=True)
                 result[b_s_index, prob_row_index, :] = \
-                    torch.sum(result_per_row, dim=0, keepdim=True)
+                    torch.max(result_per_row, dim=0)[0]
 
         return result
 
@@ -121,6 +129,7 @@ class NerTr(torch.nn.Module):
         return torch.stack(bert_feature_bulk)
 
     def get_bert_feature_first(self, data):
+        input_ids = data['input_ids']
         output_bert = self.bert_model(input_ids=data['input_ids'],
                                       attention_mask=data['attention_mask_bert'])['last_hidden_state']
         b_s, token_num, sim_dim = output_bert.shape
@@ -129,17 +138,40 @@ class NerTr(torch.nn.Module):
             word_ids_one_batch = data['words_ids'][b_s_index]
             index_not_none = torch.where(word_ids_one_batch != -100)
             word_ids_one_batch_not_none = word_ids_one_batch[index_not_none]
-            output_bert_one_batch_real = output_bert[b_s_index][index_not_none]
+            input_ids_one_batch_real = input_ids[b_s_index][index_not_none]
+            _, indices = torch.unique(word_ids_one_batch_not_none, return_inverse=True)
+            grouped_token_id_first = []
+            for i in range(torch.max(indices) + 1):
+                grouped_token_id_first.append(input_ids_one_batch_real
+                                                 [indices == i])
+            grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
+            result.append(torch.stack(grouped_bert_embedding_first))
+
+        bert_embedding = self.bert_model(input_ids=torch.stack(result))['last_hidden_state']
+        return bert_embedding
+
+    def get_bert_feature_max(self, data):
+        output_bert = self.bert_model(input_ids=data['input_ids'],
+                                      attention_mask=data['attention_mask_bert'])
+        last_hidden_state = output_bert['last_hidden_state']
+        b_s, _, sim_dim = last_hidden_state.shape
+        bert_feature_bulk = []
+        for b_s_index in range(b_s):
+            word_ids_one_batch = data['words_ids'][b_s_index]
+            index_not_none = torch.where(word_ids_one_batch != -100)
+            last_hidden_state_one_batch = last_hidden_state[b_s_index]
+            last_hidden_state_real_word = last_hidden_state_one_batch[index_not_none]
+            word_ids_one_batch_not_none = word_ids_one_batch[index_not_none]
             _, indices = torch.unique(word_ids_one_batch_not_none, return_inverse=True)
             grouped_bert_embedding = []
             for i in range(torch.max(indices) + 1):
-                grouped_bert_embedding.append(output_bert_one_batch_real
-                                                 [indices == i])
-            grouped_bert_embedding_first = [v[0] for v in grouped_bert_embedding]
-            result.append(torch.stack(grouped_bert_embedding_first))
+                grouped_bert_embedding.append(last_hidden_state_real_word
+                                              [indices == i])
+            grouped_bert_embedding_avg = [torch.max(v, dim=0)[0]
+                                          for v in grouped_bert_embedding]
+            bert_feature_bulk.append(torch.stack(grouped_bert_embedding_avg))
 
-        result = torch.stack(result)
-        return result
+        return torch.stack(bert_feature_bulk)
 
     def get_crf_mask(self, label):
         mask = torch.where(label == 0, False, True)

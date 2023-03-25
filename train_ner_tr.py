@@ -10,7 +10,7 @@ from model_components.validator_ner_tr import validate
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
           concatenate):
-    LR = 1e-4
+    LR = 1e-5
     epoch = 10000
 
     dataloader_train = get_dataloader(lang=lang, goal='train',
@@ -38,6 +38,9 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
     ner_model = NerTr(bert_model=bert_model, sim_dim=sim_dim,
                       num_ner=num_ner, ann_type=ann_type, device=device,
                       alignment=alignment, concatenate=concatenate)
+    for param in ner_model.bert_model.parameters():
+        param.requires_grad = True
+
     ner_model.to(device)
     ner_model.train()
     optimizer = torch.optim.Adam(params=ner_model.parameters(), lr=LR)
@@ -55,15 +58,14 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
             loss.backward()
             optimizer.step()
             if (step+1) % 2000 == 0:
-                loss_epoch = sum(loss_all) / len(loss_all)
-                print(loss_epoch)
-                loss_all = []
                 print('dev:')
                 loss_dev = validate(model=ner_model,
                          dataloader=dataloader_dev, num_ner=num_ner,
                          ann_type=ann_type, index_out=index_out)
                 print('dev loss', loss_dev)
 
+        loss_epoch = sum(loss_all) / len(loss_all)
+        print(loss_epoch)
         print('val:')
         loss_val = validate(model=ner_model,
                             dataloader=dataloader_test, num_ner=num_ner,
@@ -75,12 +77,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", default='fre')
     parser.add_argument("--window_len", default=30)
-    parser.add_argument("--step_len", default=5)
+    parser.add_argument("--step_len", default=30)
     parser.add_argument("--max_len_tokens", default=200)
     parser.add_argument("--tokenizer_name", default='camembert-base')
     parser.add_argument("--bert_model_name", default='camembert-base')
     parser.add_argument("--num_ner", default=9)
-    parser.add_argument("--alignment", default='first', choices=['avg', 'flow',
+    parser.add_argument("--alignment", default='max', choices=['avg', 'flow',
                                                                 'max', 'first'])
     parser.add_argument("--concatenate", default='con', choices=['add', 'con'])
     parser.add_argument("--ann_type", default='croase')
