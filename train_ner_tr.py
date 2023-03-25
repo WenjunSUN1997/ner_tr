@@ -49,25 +49,27 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
             output = ner_model(data)
             loss = output['loss']
             print(loss)
+            # print(output['path'])
             loss_all.append(loss.item())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
             if (step+1) % 2000 == 0:
                 loss_epoch = sum(loss_all) / len(loss_all)
-                # print(loss_epoch)
+                print(loss_epoch)
                 loss_all = []
                 print('dev:')
                 loss_dev = validate(model=ner_model,
                          dataloader=dataloader_dev, num_ner=num_ner,
                          ann_type=ann_type, index_out=index_out)
-                print('del loss', loss_dev)
+                print('dev loss', loss_dev)
 
+        print('val:')
         loss_val = validate(model=ner_model,
                             dataloader=dataloader_test, num_ner=num_ner,
                             ann_type=ann_type, index_out=index_out)
         scheduler.step(loss_val)
-        print(loss_val)
+        print('val loss', loss_val)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -78,9 +80,9 @@ if __name__ == "__main__":
     parser.add_argument("--tokenizer_name", default='camembert-base')
     parser.add_argument("--bert_model_name", default='camembert-base')
     parser.add_argument("--num_ner", default=9)
-    parser.add_argument("--alignment", default='flow', choices=['avg', 'flow',
+    parser.add_argument("--alignment", default='first', choices=['avg', 'flow',
                                                                 'max', 'first'])
-    parser.add_argument("--concatenate", default='add', choices=['add', 'con'])
+    parser.add_argument("--concatenate", default='con', choices=['add', 'con'])
     parser.add_argument("--ann_type", default='croase')
     parser.add_argument("--sim_dim", default=768)
     parser.add_argument("--device", default='cuda:0')
