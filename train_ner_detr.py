@@ -6,22 +6,17 @@ import argparse
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
-from model_components.validator_ner_tr import validate
+from model_components.validator_ner_detr import validate
+from model_components.loss_func import HungaryLoss
 
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
           concatenate):
     LR = 1e-5
     epoch = 10000
+    loss_func = HungaryLoss(num_ner=num_ner, device=device, window_len=window_len)
 
     dataloader_train = get_dataloader(lang=lang, goal='train',
-                                      window_len=window_len,
-                                      step_len=step_len,
-                                      max_len_tokens=max_len_tokens,
-                                      tokenizer_name=tokenizer_name,
-                                      batch_size=batch_size,
-                                      device=device)
-    dataloader_dev = get_dataloader(lang=lang, goal='dev',
                                       window_len=window_len,
                                       step_len=step_len,
                                       max_len_tokens=max_len_tokens,
@@ -36,9 +31,9 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                      batch_size=batch_size,
                                      device=device)
     bert_model = BertModel.from_pretrained(bert_model_name)
-    ner_model = NerTr(bert_model=bert_model, sim_dim=sim_dim,
+    ner_model = NerDetr(bert_model=bert_model, sim_dim=sim_dim,
                       num_ner=num_ner, ann_type=ann_type, device=device,
-                      alignment=alignment, concatenate=concatenate)
+                      alignment=alignment, concatenate=concatenate, win_len=window_len)
     for param in ner_model.bert_model.parameters():
         param.requires_grad = True
 
@@ -51,19 +46,13 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
         loss_all = []
         for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
             output = ner_model(data)
-            loss = output['loss']
+            loss = loss_func(output, data['label_' + ann_type])
             print(loss)
-            # print(output['path'])
             loss_all.append(loss.item())
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if (step+1) % 2000 == 0:
-                print('dev:')
-                loss_dev = validate(model=ner_model,
-                         dataloader=dataloader_dev, num_ner=num_ner,
-                         ann_type=ann_type, index_out=index_out)
-                print('dev loss', loss_dev)
+            print()
 
         loss_epoch = sum(loss_all) / len(loss_all)
         print(loss_epoch)

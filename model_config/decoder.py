@@ -9,7 +9,7 @@ class NerTrDecoder(torch.nn.Module):
         self.decoder_layer = torch.nn.TransformerDecoderLayer(d_model=sim_dim,
                                                               nhead=8,
                                                               batch_first=True)
-        self.decoder = torch.nn.TransformerDecoder(self.decoder_layer, num_layers=2)
+        self.decoder = torch.nn.TransformerDecoder(self.decoder_layer, num_layers=1)
         self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
 
     def get_obj_query_embedding(self, batch_size):
