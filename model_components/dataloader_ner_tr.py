@@ -16,5 +16,5 @@ def get_dataloader(lang, goal, window_len, step_len, max_len_tokens,
                               tokenizer_name=tokenizer_name,
                               max_len_tokens=max_len_tokens)
 
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
     return dataloader

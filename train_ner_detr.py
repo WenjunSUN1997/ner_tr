@@ -52,16 +52,15 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            print()
 
         loss_epoch = sum(loss_all) / len(loss_all)
         print(loss_epoch)
         print('val:')
-        loss_val = validate(model=ner_model,
-                            dataloader=dataloader_test, num_ner=num_ner,
-                            ann_type=ann_type, index_out=index_out)
-        scheduler.step(loss_val)
-        print('val loss', loss_val)
+        # loss_val = validate(model=ner_model,
+        #                     dataloader=dataloader_test, num_ner=num_ner,
+        #                     ann_type=ann_type, index_out=index_out)
+        # scheduler.step(loss_val)
+        # print('val loss', loss_val)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

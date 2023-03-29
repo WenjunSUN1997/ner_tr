@@ -80,7 +80,7 @@ class HungaryLoss(torch.nn.Module):
     def hungray_match(self, class_gt_padded, pos_gt_padded, class_pre, pos_pre):
         match_result = []
         class_loss = self.get_class_loss(class_gt_padded, class_pre)
-        pos_loss = self.get_pos_loss(pos_gt_padded, pos_pre)
+        pos_loss = self.get_pos_loss(pos_gt_padded, pos_pre, class_gt_padded)
         all_loss = (class_loss + pos_loss).tolist()
         for b_s_index in range(len(all_loss)):
             match_result.append(linear_sum_assignment(all_loss[b_s_index])[1])
@@ -93,24 +93,34 @@ class HungaryLoss(torch.nn.Module):
         for b_s_index in range(b_s):
             class_pre_one_batch = class_pre[b_s_index]
             class_gt_padded_one_batch = class_gt_padded[b_s_index]
-            for ner_index in range(self.num_ner):
-                loss[b_s_index][ner_index] = \
-                    class_pre_one_batch[ner_index][class_gt_padded_one_batch]
+            for ner_index_pre in range(self.num_ner):
+                for ner_index_gt in range(self.num_ner):
+                    if class_gt_padded_one_batch[ner_index_gt] == 0:
+                        loss[b_s_index][ner_index_pre][ner_index_gt] = \
+                            torch.tensor(0).to(self.device)
+                    else:
+                        loss[b_s_index][ner_index_pre][ner_index_gt] = \
+                            class_pre_one_batch[ner_index_pre][
+                                class_gt_padded_one_batch[ner_index_gt]]
 
         return -2 * loss * self.win_len
 
-    def get_pos_loss(self, pos_gt_padded, pos_pre):
+    def get_pos_loss(self, pos_gt_padded, pos_pre, class_gt_padded):
         b_s = len(pos_gt_padded)
         loss = torch.zeros((b_s, self.num_ner, self.num_ner))
         for b_s_index in range(b_s):
             pos_pre_one_batch = pos_pre[b_s_index]
             pos_gt_padded_one_batch = pos_gt_padded[b_s_index]
-            for ner_index in range(self.num_ner):
-                pos_pre_expanded = pos_pre_one_batch[ner_index].unsqueeze(0)\
-                    .expand(pos_gt_padded_one_batch.shape)
-                loss[b_s_index][ner_index] = \
-                    torch.sum(torch.abs(pos_pre_expanded - pos_gt_padded_one_batch),
-                              dim=1)
+            class_gt_padded_one_batch = class_gt_padded[b_s_index]
+            for ner_index_pre in range(self.num_ner):
+                for ner_index_gt in range(self.num_ner):
+                    if class_gt_padded_one_batch[ner_index_gt] == 0:
+                        loss[b_s_index][ner_index_pre][ner_index_gt] = \
+                            torch.tensor(0).to(self.device)
+                    else:
+                        loss[b_s_index][ner_index_pre][ner_index_gt] = \
+                        torch.sum(torch.abs(pos_pre_one_batch[ner_index_pre] -
+                                            pos_gt_padded_one_batch[ner_index_gt]))
 
         return loss
 
