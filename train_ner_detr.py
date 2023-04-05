@@ -7,6 +7,7 @@ import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 from model_components.validator_ner_detr import validate
+from model_components.post_process_ner_detr import post_process
 from model_components.loss_func import HungaryLoss
 
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
@@ -53,24 +54,27 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
             loss.backward()
             optimizer.step()
 
-        loss_epoch = sum(loss_all) / len(loss_all)
-        print(loss_epoch)
-        print('val:')
-        # loss_val = validate(model=ner_model,
-        #                     dataloader=dataloader_test, num_ner=num_ner,
-        #                     ann_type=ann_type, index_out=index_out)
-        # scheduler.step(loss_val)
-        # print('val loss', loss_val)
+        # loss_epoch = sum(loss_all) / len(loss_all)
+        # print(loss_epoch)
+        # print('val:')
+        loss_val = validate(model=ner_model,
+                            dataloader=dataloader_test,
+                            num_ner=num_ner,
+                            ann_type=ann_type,
+                            index_out=index_out,
+                            loss_func=loss_func)
+        scheduler.step(loss_val)
+        print('val loss', loss_val)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", default='fre')
-    parser.add_argument("--window_len", default=10)
-    parser.add_argument("--step_len", default=10)
-    parser.add_argument("--max_len_tokens", default=40)
-    parser.add_argument("--tokenizer_name", default='camembert-base')
-    parser.add_argument("--bert_model_name", default='camembert-base')
-    parser.add_argument("--num_ner", default=9)
+    parser.add_argument("--window_len", default=30)
+    parser.add_argument("--step_len", default=5)
+    parser.add_argument("--max_len_tokens", default=200)
+    parser.add_argument("--tokenizer_name", default='Jean-Baptiste/camembert-ner')
+    parser.add_argument("--bert_model_name", default='Jean-Baptiste/camembert-ner')
+    parser.add_argument("--num_ner", default=30)
     parser.add_argument("--alignment", default='first', choices=['avg', 'flow',
                                                                 'max', 'first'])
     parser.add_argument("--concatenate", default='add', choices=['add', 'con'])

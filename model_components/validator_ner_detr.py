@@ -3,18 +3,18 @@ from model_components.loss_func import HungaryLoss
 from tqdm import tqdm
 from sklearn.metrics import precision_score, recall_score, f1_score
 
-def validate(dataloader, model, ann_type, index_out, num_ner):
+def validate(dataloader, model, ann_type, index_out, num_ner, loss_func):
     labels_to_cal = [x for x in range(num_ner)]
     labels_to_cal.remove(index_out)
     label_all = []
     prediction_all = []
     loss_all = []
-    loss_func = HungaryLoss()
+    loss_func = loss_func
     for step, data in tqdm(enumerate(dataloader), total=len(dataloader)):
-        ouput = model(data)
-        loss = loss_func(ouput, data)
+        output = model(data)
+        loss = loss_func(output, data['label_' + ann_type])
         loss_all.append(loss.item())
-        prediction = ouput['path']
+        prediction = output['path']
         label = data['label_'+ann_type]
         b_s = len(label)
         for b_s_index in range(b_s):

@@ -4,14 +4,17 @@ from ast import literal_eval
 import torch
 from transformers import AutoTokenizer, BertModel
 from model_config.ner_tr import NerTr
+import math
 
 class TextDatasetBulk(torch.utils.data.Dataset):
-    def __init__(self, csv, window_len, step_len, device, tokenizer_name, max_len_tokens):
+    def __init__(self, csv, window_len, step_len, device,
+                 tokenizer_name, max_len_tokens, goal):
         super(TextDatasetBulk, self).__init__()
         self.words = [item for sublist in csv['words'] for item in literal_eval(sublist)]
         self.ner_c = [item for sublist in csv['ner_c'] for item in literal_eval(sublist)]
         self.ner_f = [item for sublist in csv['ner_f'] for item in literal_eval(sublist)]
         self.window_len = window_len
+        self.goal = goal
         self.step_len = step_len
         self.device = device
         self.max_len_tokens = max_len_tokens
@@ -43,38 +46,120 @@ class TextDatasetBulk(torch.utils.data.Dataset):
     def bulk_data(self):
         words_bulk = self.split_list(self.words, padding='.')
         ner_c_bulk = self.split_list(self.ner_c, padding=0)
-        ner_f_bulk = self.split_list(self.ner_f, padding=8)
+        ner_f_bulk = self.split_list(self.ner_f, padding=0)
+        if self.goal == 'train':
+            del_index = []
+            for index in range(len(ner_c_bulk)):
+                if ner_c_bulk[index][0] != 0\
+                        or ner_c_bulk[index][-1] != 0 \
+                        or sum(ner_c_bulk[index])==0:
+                    del_index.append(index)
+            words_bulk = [words_bulk[i] for i in range(len(words_bulk))
+                          if i not in del_index]
+            ner_c_bulk = [ner_c_bulk[i] for i in range(len(ner_c_bulk))
+                          if i not in del_index]
+            ner_f_bulk = [ner_f_bulk[i] for i in range(len(ner_f_bulk))
+                          if i not in del_index]
+
         return words_bulk, ner_c_bulk, ner_f_bulk
 
     def __len__(self):
         return len(self.words_bulk)
 
     def __getitem__(self, item):
-        output_tokenizer = self.tokenizer(self.words_bulk[item], is_split_into_words=True,
-                                   padding="max_length", max_length=self.max_len_tokens)
+        output_tokenizer = self.tokenizer(self.words_bulk[item],
+                                          is_split_into_words=True,
+                                          padding="max_length",
+                                          max_length=self.max_len_tokens)
         input_ids = output_tokenizer['input_ids']
         attention_mask_bert = output_tokenizer['attention_mask']
-        word_ids = [-100 if element is None
-                               else element for element in output_tokenizer.word_ids()]
+        word_ids = [-100 if element is None else element
+                    for element in output_tokenizer.word_ids()]
+        label_croase = torch.tensor(self.ner_c_bulk[item]).to(self.device)
+        # label_croase[label_croase != 0] = 1
+        label_fine = torch.tensor(self.ner_f_bulk[item]).to(self.device)
+        # label_fine[label_fine != 0] = 1
         return {
             'input_ids': torch.tensor(input_ids).to(self.device),
             'words_ids': torch.tensor(word_ids).to(self.device),
             'attention_mask_bert': torch.tensor(attention_mask_bert).to(self.device),
-            'label_croase': torch.tensor(self.ner_c_bulk[item]).to(self.device),
-            'label_fine': torch.tensor(self.ner_f_bulk[item]).to(self.device)
+            'label_croase': label_croase,
+            'label_fine': label_fine
         }
 
-# if __name__ == "__main__":
-#     csv = pd.read_csv('../data/train_fr.csv')
-#     dataset = TextDatasetBulk(csv, 10, 5, 'cuda:0', 'camembert-base', 50)
-#     dataloader = DataLoader(dataset, batch_size=4)
-#     bert = BertModel.from_pretrained('camembert-base')
-#     model = NerTr(bert_model=bert, sim_dim=768, max_len_words=10,
-#                   num_ner=10, ann_type='croase', device='cuda:0')
-#     model.to('cuda:0')
-#     for _, data in enumerate(dataloader):
-#         print(data)
-#         model(data)
+class TextDatasetBulkByLabel(TextDatasetBulk):
+    def __init__(self, csv, window_len, step_len, device,
+             tokenizer_name, max_len_tokens, goal, num_ner):
+        super(TextDatasetBulkByLabel, self).__init__(csv, window_len,
+                                                     step_len, device,
+                                                     tokenizer_name,
+                                                     max_len_tokens, goal)
+
+        self.num_ner = num_ner
+        self.input_ids = [[] for i in range(num_ner)]
+        self.words_id = [[] for i in range(num_ner)]
+        self.attention_mask_bert = [[] for i in range(num_ner)]
+        self.devide_by_label()
+        self.expand()
+    def devide_by_label(self):
+        for index in range(len(self.ner_c_bulk)):
+            for label_index in range(self.num_ner):
+                if label_index in self.ner_c_bulk[index]:
+                    indices = [i for i, x in enumerate(self.ner_c_bulk[index])
+                               if x == label_index]
+                    output_tokenizer = self.tokenizer(self.words_bulk[index],
+                                   is_split_into_words=True,
+                                   padding="max_length",
+                                   max_length=self.max_len_tokens)
+                    self.input_ids[label_index].append(output_tokenizer['input_ids'])
+                    self.attention_mask_bert[label_index].append(output_tokenizer[
+                                                                     'attention_mask'])
+                    word_ids = [-100 if element not in indices else 1
+                                for element in output_tokenizer.word_ids()]
+                    self.words_id[label_index].append(word_ids)
+
+    def expand(self):
+        max_len = len(max(self.words_id, key=len))
+        for index in range(len(self.words_id)):
+            num_repeats = max_len // len(self.words_id[index])
+            self.words_id[index] *= num_repeats + 1
+            self.input_ids[index] *= num_repeats + 1
+            self.attention_mask_bert[index] *= num_repeats + 1
+
+    def __len__(self):
+        return len(min(self.words_id, key=len))
+
+    def __getitem__(self, item):
+        input_ids = []
+        words_id = []
+        label = []
+        attention_mask_bert = []
+        for index in range(self.num_ner):
+            input_ids.append(self.input_ids[index][item])
+            words_id.append(self.words_id[index][item])
+            attention_mask_bert.append(self.attention_mask_bert[index][item])
+            label.append(index)
+
+        input_ids_tensor = torch.tensor(input_ids).to(self.device)
+        words_ids_tensor = torch.tensor(words_id).to(self.device)
+        attention_mask_bert_tensor = torch.tensor(attention_mask_bert).to(self.device)
+        return {
+            'input_ids': input_ids_tensor,
+            'words_ids': words_ids_tensor,
+            'label_croase': torch.tensor(label).view(-1).to(self.device),
+            'attention_mask_bert': attention_mask_bert_tensor,
+            # 'label_fine': label_fine
+        }
+
+if __name__ == "__main__":
+    csv = pd.read_csv('../data/train_fr.csv')
+    dataset = TextDatasetBulkByLabel(csv, window_len=30, step_len=30, device='cuda:0',
+             tokenizer_name='camembert-base', max_len_tokens=100, goal='train', num_ner=9)
+    dataloader = DataLoader(dataset, batch_size=4)
+    bert = BertModel.from_pretrained('camembert-base')
+    for _, data in enumerate(dataloader):
+        print(data)
+
 
 
 

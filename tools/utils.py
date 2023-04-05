@@ -4,6 +4,7 @@ from model_components.dataset_hipe import TextDataset
 import pandas as pd
 from transformers import BertModel, LlamaTokenizer, AutoTokenizer
 from tqdm import tqdm
+from datasets import load_dataset
 
 def data_preprocess(data, bert, max_len_token=618):
     '''
@@ -32,14 +33,11 @@ def data_preprocess(data, bert, max_len_token=618):
         bert_avg.append(torch.nn.functional.pad(stack, padding))
 
 if __name__ == "__main__":
-    model = BertModel.from_pretrained('shalomma/llama-7b-embeddings')
-    tokenizer = LlamaTokenizer.from_pretrained('shalomma/llama-7b-embeddings', torch_dtype=torch.float16)
-    tokenizer.add_special_tokens({'pad_token': 'a'})
-    text = 'bon jour'
-    c = tokenizer([text]*4, max_length=256,
-                                             truncation=True,
-                                             padding='max_length',
-                                             return_tensors='pt')
-    o = model(input_ids=c['input_ids'], attention_mask=c['attention_mask'])
-
-    print(c)
+    dataset = load_dataset('conll2003')
+    df = dataset['test']
+    df = pd.DataFrame(df)
+    words = [x for x in df['tokens']]
+    ner_c = [x for x in df['ner_tags']]
+    ner_f = [x for x in df['ner_tags']]
+    d = pd.DataFrame({'words': words, 'ner_c':ner_c, 'ner_f':ner_f})
+    d.to_csv('../data/test_conll2003.csv')

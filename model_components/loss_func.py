@@ -39,19 +39,19 @@ class HungaryLoss(torch.nn.Module):
                 if first_index == len(label_one_batch)-1 and \
                         label_one_batch[first_index] != index_o:
                     class_gt_one_batch.append(index_replace[label_one_batch[first_index]])
-                    pos_gt_one_batch.append([first_index, first_index])
+                    pos_gt_one_batch.append([first_index, 0])
                     first_index += 1
                 elif label_one_batch[first_index] != index_o:
                     class_gt_one_batch.append(index_replace[label_one_batch[first_index]])
                     for second_index in range(first_index+1, len(label_one_batch)):
                         if second_index==len(label_one_batch)-1 and \
                                 label_one_batch[second_index]!=index_o:
-                            pos_gt_one_batch.append([first_index, second_index])
+                            pos_gt_one_batch.append([first_index, second_index-first_index])
                             first_index = second_index + 1
                             break
                         elif label_one_batch[second_index] in index_seg or \
                                 label_one_batch[second_index]==index_o:
-                            pos_gt_one_batch.append([first_index, second_index-1])
+                            pos_gt_one_batch.append([first_index, second_index-first_index-1])
                             first_index = second_index
                             break
                 else:

@@ -7,7 +7,7 @@ class NerTrEncoder(torch.nn.Module):
                                                           nhead=8,
                                                           batch_first=True)
         self.encoder = torch.nn.TransformerEncoder(self.encoder_layer,
-                                                   num_layers=1)
+                                                   num_layers=2)
         self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
 
     def forward(self, bert_future):
