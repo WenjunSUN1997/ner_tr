@@ -31,13 +31,50 @@ def data_preprocess(data, bert, max_len_token=618):
         stack = torch.stack(temp, dim=0)
         padding = (0, 0, 0, max_len_token-len(stack))
         bert_avg.append(torch.nn.functional.pad(stack, padding))
+# {'O': 0, 'B-PER': 1, 'I-PER': 2, 'B-ORG': 3,
+# 'I-ORG': 4, 'B-LOC': 5, 'I-LOC': 6, 'B-MISC': 7,
+# 'I-MISC': 8}
+
+def data_augmentation():
+    tag_dict = {'O': 0, 'B-PER': 1, 'I-PER': 2,
+                'B-ORG': 3, 'I-ORG': 4, 'B-LOC': 5,
+                'I-LOC': 6, 'B-MISC': 7, 'I-MISC': 8}
+    words = []
+    ner_c = []
+    ner_f = []
+    with open('../data/wikiner_en_1', 'r', encoding="utf8") as file:
+        text_1 = file.read()
+    with open('../data/wikiner_en_2', 'r', encoding="utf8") as file:
+        text_2 = file.read()
+
+    text = text_1 + text_2
+    text = text.replace('\n', ' ')
+    text = text.split(' ')
+    text = [x for x in text if x != '']
+    for text_cell in text:
+        print(text_cell)
+        token, _, tag = text_cell.split('|')
+        words.append(token)
+        ner_c.append(tag_dict[tag])
+        ner_f.append(tag_dict[tag])
+
+    df = pd.read_csv('../data/train_conll2003.csv')
+    a = df.append({'words': words, 'ner_c': ner_c, 'ner_f': ner_f}, ignore_index=True)
+    a.reset_index(drop=True)
+    a.to_csv('../data/train_conll_augmentation.csv')
+
+
+
+
 
 if __name__ == "__main__":
-    dataset = load_dataset('conll2003')
-    df = dataset['test']
-    df = pd.DataFrame(df)
-    words = [x for x in df['tokens']]
-    ner_c = [x for x in df['ner_tags']]
-    ner_f = [x for x in df['ner_tags']]
-    d = pd.DataFrame({'words': words, 'ner_c':ner_c, 'ner_f':ner_f})
-    d.to_csv('../data/test_conll2003.csv')
+    data_augmentation()
+
+    # dataset = load_dataset('conll2002')
+    # df = dataset['train']
+    # df = pd.DataFrame(df)
+    # words = [x for x in df['tokens']]
+    # ner_c = [x for x in df['ner_tags']]
+    # ner_f = [x for x in df['ner_tags']]
+    # d = pd.DataFrame({'words': words, 'ner_c':ner_c, 'ner_f':ner_f})
+    # d.to_csv('../data/test_conll2003.csv')

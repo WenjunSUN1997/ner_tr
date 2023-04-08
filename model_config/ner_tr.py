@@ -1,12 +1,11 @@
 import torch
 from model_config.encoder import NerTrEncoder
 from model_config.decoder import NerTrDecoder
-from torchcrf import CRF
-from fastNLP.modules import ConditionalRandomField
 
 class NerTr(torch.nn.Module):
-    def __init__(self, bert_model, sim_dim, num_ner, ann_type, device, alignment,
-                 concatenate):
+    def __init__(self, bert_model, sim_dim,
+                 num_ner, ann_type, device,
+                 alignment, concatenate):
         '''
         :param bert_model: the huggingface bert model
         :param sim_dim: the dimention of the bert model like 768
@@ -19,20 +18,20 @@ class NerTr(torch.nn.Module):
         self.ann_type = ann_type
         self.sim_dim = sim_dim
         self.alignment = alignment
-
         self.bert_model = bert_model
         self.encoder = NerTrEncoder(sim_dim=sim_dim)
-        self.bilstm_encoder = torch.nn.LSTM(sim_dim, sim_dim*2, num_layers=1,
-                                            batch_first=True,
-                                            bidirectional=True)
-        self.decoder = NerTrDecoder(num_ner=num_ner, sim_dim=sim_dim,
+        self.decoder = NerTrDecoder(num_ner=num_ner,
+                                    sim_dim=sim_dim,
                                     device=self.device)
         self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
-        self.crf = CRF(num_ner, batch_first=True)
+        self.bilstm = torch.nn.LSTM(sim_dim, sim_dim,
+                                    num_layers=1,
+                                    batch_first=True,
+                                    bidirectional=True)
+        self.linear = torch.nn.Linear(in_features=sim_dim*2, out_features=2)
         self.activation = torch.nn.ReLU()
         self.normalize_embedding_with_prob_query = \
             torch.nn.LayerNorm(normalized_shape=sim_dim*2)
-        self.linear = torch.nn.Linear(in_features=sim_dim, out_features=num_ner)
 
     def forward(self, data):
         '''
@@ -51,17 +50,18 @@ class NerTr(torch.nn.Module):
             bert_feature = bert_feature['last_hidden_state']
 
         output_encoder = self.encoder(bert_feature)
-        # output_encoder = self.bilstm_encoder(bert_feature)[0]
-        decoder_embedding, cos_sim = self.decoder(output_encoder)
-        # cos_sim = torch.cosine_similarity(decoder_embedding.unsqueeze(1),
-        #                                   output_encoder.unsqueeze(-2),
-        #                                   dim=-1)
-        cos_sim_prob = torch.softmax(cos_sim, dim=-1)
+        output_bilstm = self.bilstm(output_encoder)[0]
+        ner_prob = torch.softmax(self.activation(self.linear(output_bilstm)), dim=-1)
+        ner_prob_1 = ner_prob[:, :, 1:2]
+
+        input_decoder = self.normalize(output_encoder)
+        decoder_embedding, cos_sim = self.decoder(input_decoder)
+        cos_sim_prob = torch.softmax(cos_sim, dim=-1) + ner_prob_1
 
         path = torch.argmax(cos_sim_prob, dim=-1).to('cpu').tolist()
-        return {'loss': torch.tensor(1),
-                'path': path,
-                'output': cos_sim_prob
+        return {'path': path,
+                'output': cos_sim_prob,
+                'ner_prob': ner_prob,
                 }
 
     def prob_times_query(self, cos_sim_prob, decoder_embedding):
@@ -134,7 +134,9 @@ class NerTr(torch.nn.Module):
             if len(data['input_ids'].shape) != 3:
                 grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
             else:
-                grouped_bert_embedding_first = [torch.mean(grouped_token_id_first[0], dim=0)]
+                grouped_bert_embedding_first = [torch.mean(grouped_token_id_first[0],
+                                                           dim=0)]
+                # grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
 
             result.append(torch.stack(grouped_bert_embedding_first))
 
