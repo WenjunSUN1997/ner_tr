@@ -74,7 +74,6 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
         print(epoch_num)
         loss_all = []
         for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
-            break
             output = ner_model(data)
             loss = loss_func(output['output'].view(-1, num_ner),
                              data['label_' + ann_type].view(-1))
@@ -98,8 +97,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                     epoch_num=epoch_num,
                                     model_type=model_type)
 
-        # loss_epoch = sum(loss_all) / len(loss_all)
-        # print(loss_epoch)
+        loss_epoch = sum(loss_all) / len(loss_all)
+        print(loss_epoch)
         print('val:')
         output_val = validate(model=ner_model,
                               dataloader=dataloader_test,
