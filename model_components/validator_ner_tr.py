@@ -43,8 +43,8 @@ def validate(dataloader, model, ann_type, index_out,
                        str(epoch_num) + '_' +str(round(f * 100, 2)) + '.pth')
         except:
             print('no')
-
-    convert_to_tsv(lang, prediction_all, ann_type, epoch_num, f)
+    if lang in ['fre', ]:
+        convert_to_tsv(lang, prediction_all, ann_type, epoch_num, f)
     return {'f': f,
             'loss_ce': sum(loss_all_ce) / len(loss_all_ce)}
 
