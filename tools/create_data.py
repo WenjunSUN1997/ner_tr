@@ -10,7 +10,8 @@ from datasets import Dataset
 def get_label():
     label_set = df['NE-COARSE-LIT'].unique()
     # define the label mapping for NER
-    label_list = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-HumanProd', 'I-HumanProd']
+    label_list = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG',
+                  'B-LOC', 'I-LOC', 'B-HumanProd', 'I-HumanProd']
     label_num = len(label_list)
     labels = ClassLabel(num_classes=label_num, names=label_list)
     return labels, label_num
@@ -42,10 +43,10 @@ def create_huggingface_file(dataframe):
     #creating dataset in json
     hug_out = []
     idx = 0
-    items = {'id': idx,'words':[ ], 'ner': [ ]}
+    items = {'id': idx, 'words': [], 'ner': []}
     hug_out.append(items)
     for index, row in dataframe.iterrows():
-        if  not re.search(r'EndOfSentence', row['MISC']):
+        if not re.search(r'EndOfSentence', row['MISC']):
             items['words'].append(row['TOKEN'])
             items['ner'].append(labels.str2int(row['NE-COARSE-LIT']))
 
@@ -71,7 +72,7 @@ def create_huggingface_file(dataframe):
 def create_huggingface_file_fine(dataframe):
     hug_out = []
     idx = 0
-    items = {'id': idx,'words':[ ], 'ner_fin': [ ]}
+    items = {'id': idx,'words': [], 'ner_fin': []}
     hug_out.append(items)
     for index, row in dataframe.iterrows():
         if  not re.search(r'EndOfSentence', row['MISC']):
@@ -96,7 +97,7 @@ def create_huggingface_file_fine(dataframe):
 
     return hug_out
 
-path = '../data/HIPE-2022-v2.1-newseye-train-fr.tsv'
+path = '../data/HIPE-2022-v2.1-newseye-test-fr.tsv'
 df = pd.read_csv(path, sep='\t', skip_blank_lines=False, engine='python', quoting=3)
 df = simple_preprocess(df)
 print(df)

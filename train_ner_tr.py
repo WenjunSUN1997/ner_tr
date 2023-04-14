@@ -11,7 +11,7 @@ from model_components.validator_ner_tr import validate
 
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
-          concatenate, model_type):
+          concatenate, model_type, train_bert):
     LR = 4e-5
     epoch = 10000
 
@@ -57,7 +57,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                 num_ner=num_ner)
 
     for param in ner_model.bert_model.parameters():
-        param.requires_grad = False
+        param.requires_grad = train_bert
 
     ner_model.to(device)
     ner_model.train()
@@ -74,7 +74,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
         print(epoch_num)
         loss_all = []
         for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
-            # break
+            break
             output = ner_model(data)
             loss = loss_func(output['output'].view(-1, num_ner),
                              data['label_' + ann_type].view(-1))
@@ -98,8 +98,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                     epoch_num=epoch_num,
                                     model_type=model_type)
 
-        loss_epoch = sum(loss_all) / len(loss_all)
-        print(loss_epoch)
+        # loss_epoch = sum(loss_all) / len(loss_all)
+        # print(loss_epoch)
         print('val:')
         output_val = validate(model=ner_model,
                               dataloader=dataloader_test,
@@ -115,17 +115,18 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--lang", default='conll', choices=['fre', 'wnut', 'conll',
+    parser.add_argument("--lang", default='fre', choices=['fre', 'wnut', 'conll',
                                                                'conll_au'])
     parser.add_argument("--window_len", default=100)
     parser.add_argument("--step_len", default=100)
     parser.add_argument("--max_len_tokens", default=400)
-    parser.add_argument("--bert_model_name", default='bert-base-uncased')
+    parser.add_argument("--bert_model_name", default='camembert-base')
     parser.add_argument("--num_ner", default=9)
     parser.add_argument("--alignment", default='first', choices=['avg', 'flow',
                                                                 'max', 'first'])
     parser.add_argument("--concatenate", default='con', choices=['add', 'con'])
     parser.add_argument("--ann_type", default='croase')
+    parser.add_argument("--train_bert", default='0')
     parser.add_argument("--sim_dim", default=768)
     parser.add_argument("--device", default='cuda:0')
     parser.add_argument("--batch_size", default=4)
@@ -137,6 +138,7 @@ if __name__ == "__main__":
     lang = args.lang
     concatenate = args.concatenate
     index_out = int(args.index_out)
+    train_bert = True if args.train_bert == '1' else False
     batch_size = int(args.batch_size)
     window_len = int(args.window_len)
     step_len = int(args.step_len)
@@ -162,4 +164,5 @@ if __name__ == "__main__":
           batch_size=batch_size,
           alignment=alignment,
           concatenate=concatenate,
-          model_type=model_type)
+          model_type=model_type,
+          train_bert=train_bert)

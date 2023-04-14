@@ -51,7 +51,7 @@ class NerTr(torch.nn.Module):
 
         output_encoder = self.encoder(bert_feature)
         output_bilstm = self.bilstm(output_encoder)[0]
-        ner_prob = torch.softmax(self.activation(self.linear(output_bilstm)), dim=-1)
+        ner_prob = torch.softmax(self.linear(self.activation(output_bilstm)), dim=-1)
         ner_prob_1 = ner_prob[:, :, 1:2]
 
         input_decoder = self.normalize(output_encoder)

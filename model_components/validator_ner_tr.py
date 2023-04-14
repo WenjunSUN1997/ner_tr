@@ -1,8 +1,10 @@
 from tqdm import tqdm
 from sklearn.metrics import precision_score, recall_score, f1_score
 import torch
+import pandas as pd
 
-def validate(dataloader, model, ann_type, index_out, num_ner, lang, epoch_num, model_type):
+def validate(dataloader, model, ann_type, index_out,
+             num_ner, lang, epoch_num, model_type):
     labels_to_cal = [x for x in range(num_ner)]
     labels_to_cal.remove(index_out)
     label_all = []
@@ -42,8 +44,27 @@ def validate(dataloader, model, ann_type, index_out, num_ner, lang, epoch_num, m
         except:
             print('no')
 
+    convert_to_tsv(lang, prediction_all, ann_type, epoch_num, f)
     return {'f': f,
             'loss_ce': sum(loss_all_ce) / len(loss_all_ce)}
+
+def convert_to_tsv(lang, prediction, ann_type, epoch_num, f):
+    dict_lang_tsv_path = {'fre': 'data/fr_gt.tsv',}
+    dict_index_entity_type = {0: 'O', 1: 'B-PER', 2: 'I-PER',
+                              3: 'B-ORG', 4: 'I-ORG', 5: 'B-LOC',
+                              6: 'I-LOC', 7: 'B-HumanProd', 8: 'I-HumanProd'}
+    dict_ann_clumn = {'croase': 'NE-COARSE-LIT'}
+    tsv = pd.read_csv(dict_lang_tsv_path[lang])
+    type_predict = [dict_index_entity_type[v] for v in prediction[:len(tsv)]]
+    tsv[dict_ann_clumn[ann_type]] = type_predict
+    tsv.to_csv('log/' + lang + '_' +
+                str(epoch_num) + '_' +str(round(f * 100, 2)) + '.tsv',
+               index=False)
+
+
+
+
+
 
 
 

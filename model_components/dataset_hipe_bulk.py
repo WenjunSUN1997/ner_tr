@@ -4,7 +4,7 @@ from ast import literal_eval
 import torch
 from transformers import AutoTokenizer, BertModel
 from model_config.ner_tr import NerTr
-import math
+from math import ceil
 
 class TextDatasetBulk(torch.utils.data.Dataset):
     def __init__(self, csv, window_len, step_len, device,
@@ -14,7 +14,8 @@ class TextDatasetBulk(torch.utils.data.Dataset):
         self.words_raw = [item for sublist in csv['words'] for item in literal_eval(sublist)]
         self.words = []
         for token in self.words_raw:
-            self.words.append(token.replace('¬', ''))
+            if token != '¬':
+                self.words.append(token.replace('¬', ''))
 
         self.ner_c = [item for sublist in csv['ner_c'] for item in literal_eval(sublist)]
         self.ner_f = [item for sublist in csv['ner_f'] for item in literal_eval(sublist)]
@@ -28,25 +29,16 @@ class TextDatasetBulk(torch.utils.data.Dataset):
 
     def split_list(self, lst, padding):
         # 列表长度
-        length = len(lst)
-
-        # 计算切割窗口的数量
-        num_windows = (length - self.window_len) // self.step_len + 1
-
-        # 如果列表不足一个切割窗口，则在列表末尾填充零
-        if length < self.window_len:
-            lst += [padding] * (self.window_len - length)
-            return [lst]
-
-        # 划分列表
-        windows = [lst[i * self.step_len:i * self.step_len + self.window_len]
-                   for i in range(num_windows)]
-
-        # 如果最后一个窗口不足 m 个元素，则在窗口末尾填充零
-        if len(windows[-1]) < self.window_len:
-            windows[-1] += [padding] * (self.window_len - len(windows[-1]))
-
-        return windows
+        num_sub_lists = ceil(len(lst) / self.step_len)
+        sub_lists = []
+        for i in range(num_sub_lists):
+            start = i * self.step_len
+            end = min(start + self.window_len, len(lst))
+            sub_list = lst[start:end]
+            if len(sub_list) < self.window_len:
+                sub_list += [padding] * (self.window_len - len(sub_list))
+            sub_lists.append(sub_list)
+        return sub_lists
 
     def bulk_data(self):
         words_bulk = self.split_list(self.words, padding='.')
@@ -54,11 +46,11 @@ class TextDatasetBulk(torch.utils.data.Dataset):
         ner_f_bulk = self.split_list(self.ner_f, padding=0)
         if self.goal == 'train':
             del_index = []
-            for index in range(len(ner_c_bulk)):
-                if ner_c_bulk[index][0] != 0\
-                        or ner_c_bulk[index][-1] != 0 \
-                        or sum(ner_c_bulk[index])==0:
-                    del_index.append(index)
+            # for index in range(len(ner_c_bulk)):
+            #     if ner_c_bulk[index][0] != 0\
+            #             or ner_c_bulk[index][-1] != 0 \
+            #             or sum(ner_c_bulk[index])==0:
+            #         del_index.append(index)
             words_bulk = [words_bulk[i] for i in range(len(words_bulk))
                           if i not in del_index]
             ner_c_bulk = [ner_c_bulk[i] for i in range(len(ner_c_bulk))
