@@ -1,6 +1,7 @@
 from tqdm import tqdm
 from sklearn.metrics import precision_score, recall_score, f1_score
 import torch
+from model_components.loss_func import FocalLoss
 
 def validate(dataloader, model, ann_type, index_out, num_ner, lang, epoch_num, model_type):
     labels_to_cal = [x for x in range(num_ner)]
@@ -10,15 +11,21 @@ def validate(dataloader, model, ann_type, index_out, num_ner, lang, epoch_num, m
     loss_all = []
     loss_all_ce = []
     loss_func = torch.nn.CrossEntropyLoss()
+    loss_func_ner = FocalLoss(gamma=2.0, alpha=0.999)
     for step, data in tqdm(enumerate(dataloader), total=len(dataloader)):
         try:
             ouput = model(data)
         except:
-            continue
+            print('error')
         prediction = ouput['path']
-        label = data['label_'+ann_type]
-        loss_ce = loss_func(ouput['output'].view(-1, num_ner),
-                         data['label_' + ann_type].view(-1))
+        if model_type == 'ner_tr':
+            label = data['label_'+ann_type]
+            loss_ce = loss_func(ouput['output'].view(-1, num_ner),
+                             data['label_' + ann_type].view(-1))
+        else:
+            label = data['label_detect']
+            loss_ce = loss_func_ner(ouput['ner_prob'].view(-1, 2),
+                                data['label_detect'].view(-1))
         loss_all_ce.append(loss_ce.item())
         b_s = len(label)
         for b_s_index in range(b_s):

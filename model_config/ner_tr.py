@@ -28,10 +28,8 @@ class NerTr(torch.nn.Module):
                                     num_layers=1,
                                     batch_first=True,
                                     bidirectional=True)
-        self.linear = torch.nn.Linear(in_features=sim_dim*2, out_features=2)
+        self.linear = torch.nn.Linear(in_features=sim_dim, out_features=2)
         self.activation = torch.nn.ReLU()
-        self.normalize_embedding_with_prob_query = \
-            torch.nn.LayerNorm(normalized_shape=sim_dim*2)
 
     def forward(self, data):
         '''
@@ -42,6 +40,7 @@ class NerTr(torch.nn.Module):
             bert_feature = self.get_bert_feature_avg(data)
         elif self.alignment == 'first':
             bert_feature = self.get_bert_feature_first(data)
+            bert_feature_detect = self.get_bert_feature_first(data, goal='detect')
         elif self.alignment == 'max':
             bert_feature = self.get_bert_feature_max(data)
         else:
@@ -50,18 +49,16 @@ class NerTr(torch.nn.Module):
             bert_feature = bert_feature['last_hidden_state']
 
         output_encoder = self.encoder(bert_feature)
-        output_bilstm = self.bilstm(output_encoder)[0]
-        ner_prob = torch.softmax(self.activation(self.linear(output_bilstm)), dim=-1)
-        ner_prob_1 = ner_prob[:, :, 1:2]
+        # output_bilstm = self.bilstm(output_encoder)[0]
 
         input_decoder = self.normalize(output_encoder)
         decoder_embedding, cos_sim = self.decoder(input_decoder)
-        cos_sim_prob = torch.softmax(cos_sim, dim=-1) + ner_prob_1
+        cos_sim_prob = torch.softmax(cos_sim, dim=-1)
+        path = torch.argmax(cos_sim_prob, dim=-1).to('cpu')
+        path = path.tolist()
 
-        path = torch.argmax(cos_sim_prob, dim=-1).to('cpu').tolist()
         return {'path': path,
                 'output': cos_sim_prob,
-                'ner_prob': ner_prob,
                 }
 
     def prob_times_query(self, cos_sim_prob, decoder_embedding):
@@ -105,16 +102,21 @@ class NerTr(torch.nn.Module):
 
         return torch.stack(bert_feature_bulk)
 
-    def get_bert_feature_first(self, data):
+    def get_bert_feature_first(self, data, goal='ner'):
+        if goal == 'detect':
+            key = 'words_ids_detect'
+        else:
+            key = 'words_ids'
+
         input_ids = data['input_ids']
         if len(data['input_ids'].shape) == 3:
             input_ids = data['input_ids'].view(-1, input_ids.shape[-1])
             attention_mask = data['attention_mask_bert'].view(-1, input_ids.shape[-1])
-            words_ids = data['words_ids'].view(-1, input_ids.shape[-1])
+            words_ids = data[key].view(-1, input_ids.shape[-1])
         else:
             input_ids = data['input_ids']
             attention_mask = data['attention_mask_bert']
-            words_ids = data['words_ids']
+            words_ids = data[key]
 
         output_bert = self.bert_model(input_ids=input_ids,
                                       attention_mask=attention_mask
@@ -134,13 +136,15 @@ class NerTr(torch.nn.Module):
             if len(data['input_ids'].shape) != 3:
                 grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
             else:
-                grouped_bert_embedding_first = [torch.mean(grouped_token_id_first[0],
-                                                           dim=0)]
-                # grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
+                if goal != 'detect':
+                    grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
+                    # grouped_bert_embedding_first = [torch.mean(grouped_token_id_first[0],
+                    #                                            dim=0)]
+                else:
+                    grouped_bert_embedding_first = [v[0] for v in grouped_token_id_first]
 
             result.append(torch.stack(grouped_bert_embedding_first))
 
-        # bert_embedding = self.bert_model(input_ids=torch.stack(result))['last_hidden_state']
         if len(data['input_ids'].shape) != 3:
             return torch.stack(result)
         else:

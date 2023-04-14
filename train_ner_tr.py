@@ -1,6 +1,7 @@
 from model_components.dataloader_ner_tr import get_dataloader
 from model_config.ner_tr import NerTr
 from model_config.ner_detr import NerDetr
+from model_components.loss_func import FocalLoss
 from model_config.ner_detector import NerDetector
 from transformers import BertModel, BertConfig
 import argparse
@@ -11,7 +12,7 @@ from model_components.validator_ner_tr import validate
 
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
-          concatenate, model_type):
+          concatenate, model_type,  train_bert):
     LR = 4e-5
     epoch = 10000
 
@@ -57,7 +58,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                 num_ner=num_ner)
 
     for param in ner_model.bert_model.parameters():
-        param.requires_grad = False
+        param.requires_grad = train_bert
 
     ner_model.to(device)
     ner_model.train()
@@ -69,19 +70,22 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                   verbose=True)
     loss_func = torch.nn.CrossEntropyLoss()
     weight = torch.tensor([8., 1.])
-    loss_func_ner = torch.nn.CrossEntropyLoss()
+    loss_func_ner = FocalLoss(gamma=2.0, alpha=0.999)
     for epoch_num in range(epoch):
         print(epoch_num)
         loss_all = []
         for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
             # break
             output = ner_model(data)
-            loss = loss_func(output['output'].view(-1, num_ner),
-                             data['label_' + ann_type].view(-1))
-            loss_ner = loss_func_ner(output['ner_prob'].view(-1, 2),
-                             data['label_detect'].view(-1))
-            loss_fin = loss + loss_ner
-            # print(loss_fin)
+            if model_type == 'detector':
+                loss_ner = loss_func_ner(output['ner_prob'].view(-1, 2),
+                                 data['label_detect'].view(-1))
+                loss_fin = loss_ner
+            elif model_type == 'ner_tr':
+                loss = loss_func(output['output'].view(-1, num_ner),
+                                 data['label_' + ann_type].view(-1))
+                loss_fin = loss
+
             loss_all.append(loss_fin.item())
             optimizer.zero_grad()
             loss_fin.backward()
@@ -115,12 +119,12 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--lang", default='conll', choices=['fre', 'wnut', 'conll',
+    parser.add_argument("--lang", default='fre', choices=['fre', 'wnut', 'conll',
                                                                'conll_au'])
     parser.add_argument("--window_len", default=100)
     parser.add_argument("--step_len", default=100)
     parser.add_argument("--max_len_tokens", default=400)
-    parser.add_argument("--bert_model_name", default='bert-base-uncased')
+    parser.add_argument("--bert_model_name", default='camembert-base')
     parser.add_argument("--num_ner", default=9)
     parser.add_argument("--alignment", default='first', choices=['avg', 'flow',
                                                                 'max', 'first'])
@@ -129,8 +133,9 @@ if __name__ == "__main__":
     parser.add_argument("--sim_dim", default=768)
     parser.add_argument("--device", default='cuda:0')
     parser.add_argument("--batch_size", default=4)
+    parser.add_argument("--train_bert", default=0)
     parser.add_argument("--index_out", default=0)
-    parser.add_argument("--model_type", default='ner_tr', choices=['ner_tr', 'detector'])
+    parser.add_argument("--model_type", default='detector', choices=['ner_tr', 'detector'])
     args = parser.parse_args()
     print(args)
     alignment = args.alignment
@@ -139,6 +144,7 @@ if __name__ == "__main__":
     index_out = int(args.index_out)
     batch_size = int(args.batch_size)
     window_len = int(args.window_len)
+    train_bert = True if args.train_bert == '1' else False
     step_len = int(args.step_len)
     max_len_tokens = int(args.max_len_tokens)
     tokenizer_name = args.bert_model_name
@@ -162,4 +168,5 @@ if __name__ == "__main__":
           batch_size=batch_size,
           alignment=alignment,
           concatenate=concatenate,
-          model_type=model_type)
+          model_type=model_type,
+          train_bert=train_bert)

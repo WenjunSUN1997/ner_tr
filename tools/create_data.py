@@ -10,7 +10,8 @@ from datasets import Dataset
 def get_label():
     label_set = df['NE-COARSE-LIT'].unique()
     # define the label mapping for NER
-    label_list = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC', 'B-HumanProd', 'I-HumanProd']
+    label_list = ['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC',
+                  'I-LOC', 'B-HumanProd', 'I-HumanProd']
     label_num = len(label_list)
     labels = ClassLabel(num_classes=label_num, names=label_list)
     return labels, label_num

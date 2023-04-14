@@ -145,6 +145,24 @@ class HungaryLoss(torch.nn.Module):
 
         return sum(class_loss) + sum(pos_loss)
 
+class FocalLoss(torch.nn.Module):
+    def __init__(self, gamma=2.0, alpha=1/1000, reduction='mean'):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.alpha = alpha
+        self.reduction = reduction
+
+    def forward(self, inputs, targets):
+        ce_loss = torch.nn.CrossEntropyLoss(reduction='none')(inputs, targets)
+        pt = torch.exp(-ce_loss)
+        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
+        if self.reduction == 'mean':
+            return torch.mean(focal_loss)
+        elif self.reduction == 'sum':
+            return torch.sum(focal_loss)
+        else:
+            return focal_loss
+
 
 
 

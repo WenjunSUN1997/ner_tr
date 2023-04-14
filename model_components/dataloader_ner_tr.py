@@ -20,14 +20,15 @@ def get_dataloader(lang, goal, window_len, step_len, max_len_tokens,
     csv = pd.read_csv(file_path_dict[lang][goal])
 
     if goal == 'train' and model_type == 'detector':
-        dataset = TextDatasetBulk(csv=csv,
-                                  window_len=window_len,
-                                  step_len=step_len,
-                                  device=device,
-                                  tokenizer_name=tokenizer_name,
-                                  max_len_tokens=max_len_tokens,
-                                  goal=goal,
-                                  model_type=model_type)
+        dataset = TextDatasetBulkByLabel(csv=csv,
+                                         window_len=window_len,
+                                         step_len=step_len,
+                                         device=device,
+                                         tokenizer_name=tokenizer_name,
+                                         max_len_tokens=max_len_tokens,
+                                         goal=goal,
+                                         num_ner=num_ner,
+                                         model_type=model_type)
     elif goal == 'train' and model_type == 'ner_tr':
         dataset = TextDatasetBulkByLabel(csv=csv,
                                   window_len=window_len,
