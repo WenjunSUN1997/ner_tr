@@ -3,7 +3,7 @@ from model_config.ner_tr import NerTr
 from model_config.ner_detr import NerDetr
 from model_components.loss_func import FocalLoss
 from model_config.ner_detector import NerDetector
-from transformers import BertModel, BertConfig
+from transformers import BertModel, BertConfig, BertForTokenClassification
 import argparse
 import torch
 from torch.optim.lr_scheduler import ReduceLROnPlateau
@@ -13,7 +13,7 @@ from model_components.validator_ner_tr import validate
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
           concatenate, model_type,  train_bert):
-    LR = 4e-5
+    LR = 4e-6
     epoch = 10000
 
     dataloader_train = get_dataloader(lang=lang, goal='train',
@@ -53,9 +53,10 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                           alignment=alignment,
                           concatenate=concatenate)
     elif model_type == 'detector':
-        ner_model = NerDetector(bert_model=bert_model,
+        ner_model = NerDetector(bert_model= bert_model,
                                 sim_dim=sim_dim,
-                                num_ner=num_ner)
+                                num_ner=num_ner,
+                                ann_type=ann_type)
 
     for param in ner_model.bert_model.parameters():
         param.requires_grad = train_bert
@@ -66,11 +67,11 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
     scheduler = ReduceLROnPlateau(optimizer,
                                   mode='min',
                                   factor=0.5,
-                                  patience=3,
+                                  patience=1,
                                   verbose=True)
     loss_func = torch.nn.CrossEntropyLoss()
-    weight = torch.tensor([8., 1.])
-    loss_func_ner = FocalLoss(gamma=2.0, alpha=0.999)
+    loss_func_ner = FocalLoss(gamma=2.0, alpha=0.9999)
+    # loss_func_ner = torch.nn.CrossEntropyLoss()
     for epoch_num in range(epoch):
         print(epoch_num)
         loss_all = []
@@ -78,8 +79,9 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
             # break
             output = ner_model(data)
             if model_type == 'detector':
-                loss_ner = loss_func_ner(output['ner_prob'].view(-1, 2),
-                                 data['label_detect'].view(-1))
+                # loss_ner = loss_func_ner(output['ner_prob'].view(-1, 2),
+                #                  data['label_detect'].view(-1))
+                loss_ner = output['loss']
                 loss_fin = loss_ner
             elif model_type == 'ner_tr':
                 loss = loss_func(output['output'].view(-1, num_ner),

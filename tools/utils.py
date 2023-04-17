@@ -5,6 +5,7 @@ import pandas as pd
 from transformers import BertModel, LlamaTokenizer, AutoTokenizer
 from tqdm import tqdm
 from datasets import load_dataset
+from ast import literal_eval
 
 def data_preprocess(data, bert, max_len_token=618):
     '''
@@ -67,8 +68,22 @@ def data_augmentation():
 
 
 
+
 if __name__ == "__main__":
-    data_augmentation()
+    dict_index_entity_type = {0: 'O', 1: 'B-PER', 2: 'I-PER',
+                              3: 'B-ORG', 4: 'I-ORG', 5: 'B-LOC',
+                              6: 'I-LOC', 7: 'B-HumanProd', 8: 'I-HumanProd'}
+    df1 = pd.read_csv('../data/test_fr.csv')
+    tag = df1['ner_c']
+    b = []
+    for x in tag:
+        c= []
+        a = literal_eval(x)
+        b.append(['E' if v !=0 else 'O' for v in a])
+    df1['ner_c'] = b
+    df1.to_csv('df2.csv')
+
+    # data_augmentation()
 
     # dataset = load_dataset('conll2002')
     # df = dataset['train']

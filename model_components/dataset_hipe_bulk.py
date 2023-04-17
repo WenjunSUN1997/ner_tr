@@ -16,8 +16,8 @@ class TextDatasetBulk(torch.utils.data.Dataset):
         for token in self.words_raw:
             self.words.append(token.replace('¬', ''))
 
-        self.tagger = StanfordPOSTagger('../tools/french-ud.tagger',
-                                        '../tools/stanford-postagger.jar')
+        self.tagger = StanfordPOSTagger('tools/french-ud.tagger',
+                                        'tools/stanford-postagger.jar')
         self.tagset = []
         self.ner_c = [item for sublist in csv['ner_c'] for item in literal_eval(sublist)]
         self.ner_f = [item for sublist in csv['ner_f'] for item in literal_eval(sublist)]
@@ -100,15 +100,22 @@ class TextDatasetBulk(torch.utils.data.Dataset):
             label_croase[label_croase != 0] = 1
             label_fine[label_fine != 0] = 1
         no_zero = (torch.abs(label_croase) > 0)
-        label_detect = torch.where(no_zero != 0, torch.tensor(1).to(self.device),
-                                   torch.tensor(0).to(self.device))
+        # label_detect = torch.where(no_zero != 0, torch.tensor(1).to(self.device),
+        #                            torch.tensor(0).to(self.device))
+        # label_detect = []
+        # for x in word_ids:
+        #     if x == -100:
+        #         label_detect.append(-100)
+        #     else:
+        #         label_detect.append(label_croase[x].item())
+
         return {
             'input_ids': torch.tensor(input_ids).to(self.device),
             'words_ids': torch.tensor(word_ids).to(self.device),
             'attention_mask_bert': torch.tensor(attention_mask_bert).to(self.device),
             'label_croase': label_croase,
             'label_fine': label_fine,
-            'label_detect': label_detect.to(self.device)
+            'label_detect': label_croase
         }
 
 class TextDatasetBulkByLabel(TextDatasetBulk):
@@ -126,8 +133,8 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
         self.words_pos = [[] for i in range(num_ner)]
         self.attention_mask_bert = [[] for i in range(num_ner)]
         self.input_ids_detect = [[] for i in range(num_ner)]
-        self.words_id_detect = [[] for i in range(num_ner)]
-        self.attention_mask_bert_detect = [[] for i in range(num_ner)]
+        self.words_id_detect = [[] for i in range(2)]
+        self.attention_mask_bert_detect = [[] for i in range(2)]
         self.label_detect = [[] for i in range(num_ner)]
         self.devide_by_label()
         self.expand()
@@ -146,8 +153,8 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
                                    is_split_into_words=True,
                                    padding="max_length",
                                    max_length=self.max_len_tokens)
-                    self.words_pos[label_index].append(self.get_pos(self.words_bulk[
-                                                                        index]))
+                    # self.words_pos[label_index].append(self.get_pos(self.words_bulk[
+                    #                                                     index]))
                     self.input_ids[label_index].append(output_tokenizer['input_ids'])
                     self.attention_mask_bert[label_index].append(output_tokenizer[
                                                                      'attention_mask'])
@@ -155,14 +162,24 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
                                 for element in output_tokenizer.word_ids()]
                     self.words_id[label_index].append(word_ids)
 
-                    word_ids_detect = [-100 if element is None
-                                       else element
-                                       for element in output_tokenizer.word_ids()]
-                    self.words_id_detect[label_index].append(word_ids_detect)
-                    self.input_ids_detect[label_index].append(output_tokenizer['input_ids'])
-                    self.attention_mask_bert_detect[label_index].append(output_tokenizer[
-                                                                 'attention_mask'])
-                    self.label_detect[label_index].append([1 if x != 0 else x for x in self.ner_c_bulk[index]])
+                    if label_index == 0:
+                        word_ids_detect = [-100 if element not in indices_0
+                                           else 1
+                                           for element in output_tokenizer.word_ids()]
+                        self.words_id_detect[0].append(word_ids_detect)
+                        self.input_ids_detect[0].append(output_tokenizer[
+                                                                      'input_ids'])
+                        self.attention_mask_bert_detect[0].append(output_tokenizer[
+                                                                    'attention_mask'])
+                    else:
+                        word_ids_detect = [-100 if element not in indices_1
+                                           else 1
+                                           for element in output_tokenizer.word_ids()]
+                        self.words_id_detect[1].append(word_ids_detect)
+                        self.input_ids_detect[1].append(output_tokenizer[
+                                                            'input_ids'])
+                        self.attention_mask_bert_detect[1].append(output_tokenizer[
+                                                                      'attention_mask'])
 
     def expand(self):
         max_len_0 = len(max(self.words_id, key=len))
@@ -175,16 +192,18 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
                 (self.input_ids[index], max_len)
             self.attention_mask_bert[index] = self.expand_list\
                 (self.attention_mask_bert[index], max_len)
+
+        for index in range(2):
             self.words_id_detect[index] = self.expand_list \
                 (self.words_id_detect[index], max_len)
             self.attention_mask_bert_detect[index] = self.expand_list \
                 (self.attention_mask_bert_detect[index], max_len)
             self.input_ids_detect[index] = self.expand_list \
                 (self.input_ids_detect[index], max_len)
-            self.label_detect[index] = self.expand_list \
-                (self.label_detect[index], max_len)
-            self.words_pos[index] = self.expand_list \
-                (self.words_pos[index], max_len)
+            # self.label_detect[index] = self.expand_list \
+            #     (self.label_detect[index], max_len)
+            # self.words_pos[index] = self.expand_list \
+            #     (self.words_pos[index], max_len)
 
     def expand_list(self, original_list, desired_length):
         while len(original_list) < desired_length:
@@ -204,17 +223,18 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
         attention_mask_bert_detect = []
         words_id_detect = []
         label_detect = []
-        words_pos = []
+        # words_pos = []
         for index in range(self.num_ner):
             input_ids.append(self.input_ids[index][item])
             words_id.append(self.words_id[index][item])
             attention_mask_bert.append(self.attention_mask_bert[index][item])
             label.append(index)
+
+        for index in range(2):
             input_ids_detect.append(self.input_ids_detect[index][item])
             attention_mask_bert_detect.append(self.attention_mask_bert_detect[index][item])
             words_id_detect.append(self.words_id_detect[index][item])
-            label_detect.append(self.label_detect[index][item])
-            words_pos.append(self.words_pos[index][item])
+            label_detect.append(0 if index == 0 else 1)
 
         input_ids_tensor = torch.tensor(input_ids).to(self.device)
         words_ids_tensor = torch.tensor(words_id).to(self.device)
@@ -223,8 +243,8 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
         attention_mask_bert_detect_tensor = torch.tensor(attention_mask_bert_detect)\
             .to(self.device)
         words_ids_detect_tensor = torch.tensor(words_id_detect).to(self.device)
-        label_detect_tensor = torch.tensor(label_detect).to(self.device)
-        words_pos = torch.tensor(words_pos).to(self.device)
+        # label_detect_tensor = torch.tensor(label_detect).to(self.device)
+        # words_pos = torch.tensor(words_pos).to(self.device)
 
         return {
             'input_ids': input_ids_tensor,
@@ -234,8 +254,8 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
             'input_ids_detect': input_ids_detect_tensor,
             'words_ids_detect': words_ids_detect_tensor,
             'attention_mask_bert_detect': attention_mask_bert_detect_tensor,
-            'label_detect': label_detect_tensor,
-            'word_pos': words_pos,
+            'label_detect':torch.tensor(label_detect).view(-1).to(self.device),
+            # 'word_pos': words_pos,
             # 'label_fine': label_fine
         }
 

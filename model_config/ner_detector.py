@@ -4,7 +4,7 @@ from model_config.decoder import NerTrDecoder
 from torchcrf import CRF
 
 class NerDetector(torch.nn.Module):
-    def __init__(self, bert_model, sim_dim, num_ner):
+    def __init__(self, bert_model, sim_dim, num_ner, ann_type):
         super(NerDetector, self).__init__()
         self.bert_model = bert_model
         self.encoder = NerTrEncoder(sim_dim=sim_dim)
@@ -12,19 +12,40 @@ class NerDetector(torch.nn.Module):
                                     sim_dim=sim_dim,
                                     device='cuda:0')
         self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
-        self.linear = torch.nn.Linear(in_features=sim_dim, out_features=2)
+        self.linear = torch.nn.Linear(in_features=sim_dim*2, out_features=2)
+        self.crf = CRF(num_tags=2, batch_first=True)
+        self.ann_type = ann_type
+        self.bilstm = torch.nn.LSTM(sim_dim, sim_dim,
+                                    num_layers=2,
+                                    batch_first=True,
+                                    bidirectional=True)
 
     def forward(self, data):
         bert_feature = self.get_bert_feature_first(data)
-        output_encoder = self.encoder(bert_feature.squeeze(0))
-        input_linear = self.normalize(output_encoder)
+        # output_encoder = self.encoder(bert_feature)
+        input_linear = self.bilstm(bert_feature)[0]
         output_linear = self.linear(input_linear)
         ner_prob = torch.softmax(output_linear, dim=-1)
-        path = torch.argmax(ner_prob, dim=-1).to('cpu')
-        path = path.tolist()
+        num_token = data['label_detect'].shape[-1]
+        crf_loss = self.crf(ner_prob, data['label_detect'].view(-1, num_token),
+                            reduction='mean')
+        path = self.crf.decode(ner_prob)
+        # path = torch.argmax(ner_prob, dim=-1).to('cpu')
+        # path = path.tolist()
         return {'path': path,
                 'ner_prob': ner_prob,
-                'loss': 1}
+                'loss': -1 * crf_loss}
+    # def forward(self, data):
+    #     output = self.bert_model(input_ids=data['input_ids'],
+    #                                       attention_mask=data['attention_mask_bert'],
+    #                                       labels=data['label_detect'])
+    #     loss = output['loss']
+    #     tr_logits = output['logits']
+    #     path = torch.argmax(torch.softmax(tr_logits, dim=-1), dim=-1).to('cpu')
+    #     path = path.tolist()
+    #     return {'path': path,
+    #             'ner_prob': tr_logits,
+    #             'loss': loss}
 
     def get_bert_feature_first(self, data):
         try:
