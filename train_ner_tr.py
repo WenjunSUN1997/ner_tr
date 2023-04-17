@@ -9,10 +9,12 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 from model_components.validator_ner_tr import validate
 
+torch.manual_seed(3407)
+
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
           concatenate, model_type, train_bert):
-    LR = 4e-5
+    LR = 2e-5
     epoch = 10000
 
     dataloader_train = get_dataloader(lang=lang, goal='train',
@@ -43,6 +45,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                      num_ner=num_ner,
                                      model_type=model_type)
     bert_model = BertModel.from_pretrained(bert_model_name)
+    #bert_model.load_state_dict(torch.load('model_zoo/fre_detector4_61.86.pth'))
     if model_type == 'ner_tr':
         ner_model = NerTr(bert_model=bert_model,
                           sim_dim=sim_dim,
@@ -63,17 +66,20 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
     ner_model.train()
     optimizer = torch.optim.AdamW(ner_model.parameters(), lr=LR)
     scheduler = ReduceLROnPlateau(optimizer,
-                                  mode='min',
+                                  mode='max',
                                   factor=0.5,
                                   patience=3,
                                   verbose=True)
-    loss_func = torch.nn.CrossEntropyLoss()
+    weight_ner = torch.ones(num_ner)
+    weight_ner[0] = 0.1
+    loss_func = torch.nn.CrossEntropyLoss(weight=weight_ner.to(device))
     weight = torch.tensor([8., 1.])
     loss_func_ner = torch.nn.CrossEntropyLoss()
     for epoch_num in range(epoch):
         print(epoch_num)
         loss_all = []
         for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
+            # break
             output = ner_model(data)
             loss = loss_func(output['output'].view(-1, num_ner),
                              data['label_' + ann_type].view(-1))
@@ -108,7 +114,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                               lang=lang,
                               epoch_num=epoch_num,
                               model_type=model_type)
-        scheduler.step(output_val['loss_ce'])
+        #scheduler.step(output_val['loss_ce'])
+        scheduler.step(output_val['f'])
         print('val loss', output_val['loss_ce'])
         print('\n')
 
@@ -125,11 +132,11 @@ if __name__ == "__main__":
                                                                 'max', 'first'])
     parser.add_argument("--concatenate", default='con', choices=['add', 'con'])
     parser.add_argument("--ann_type", default='croase')
-    parser.add_argument("--train_bert", default='0')
     parser.add_argument("--sim_dim", default=768)
     parser.add_argument("--device", default='cuda:0')
-    parser.add_argument("--batch_size", default=4)
+    parser.add_argument("--batch_size", default=2)
     parser.add_argument("--index_out", default=0)
+    parser.add_argument("--train_bert", default=0)
     parser.add_argument("--model_type", default='ner_tr', choices=['ner_tr', 'detector'])
     args = parser.parse_args()
     print(args)
@@ -137,9 +144,9 @@ if __name__ == "__main__":
     lang = args.lang
     concatenate = args.concatenate
     index_out = int(args.index_out)
-    train_bert = True if args.train_bert == '1' else False
     batch_size = int(args.batch_size)
     window_len = int(args.window_len)
+    train_bert = True if args.train_bert == '1' else False
     step_len = int(args.step_len)
     max_len_tokens = int(args.max_len_tokens)
     tokenizer_name = args.bert_model_name

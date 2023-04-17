@@ -28,7 +28,7 @@ class NerTr(torch.nn.Module):
                                     num_layers=1,
                                     batch_first=True,
                                     bidirectional=True)
-        self.linear = torch.nn.Linear(in_features=sim_dim*2, out_features=2)
+        self.linear = torch.nn.Linear(in_features=sim_dim * 2, out_features=2)
         self.activation = torch.nn.ReLU()
         self.normalize_embedding_with_prob_query = \
             torch.nn.LayerNorm(normalized_shape=sim_dim*2)
@@ -50,15 +50,17 @@ class NerTr(torch.nn.Module):
             bert_feature = bert_feature['last_hidden_state']
 
         output_encoder = self.encoder(bert_feature)
-        output_bilstm = self.bilstm(output_encoder)[0]
+        output_bilstm = self.bilstm(bert_feature)[0]
+        #ner_prob = torch.softmax(self.linear(output_bilstm), dim=-1)
         ner_prob = torch.softmax(self.linear(self.activation(output_bilstm)), dim=-1)
-        ner_prob_1 = ner_prob[:, :, 1:2]
-
+        ner_prob_1 = ner_prob[:, :, 1:2].repeat(1, 1, 8)
+        ner_prob_0 = ner_prob[:, :, 0:1].repeat(1, 1, 1)
+        new = torch.cat([ner_prob_0, ner_prob_1], dim=-1)
         input_decoder = self.normalize(output_encoder)
         decoder_embedding, cos_sim = self.decoder(input_decoder)
-        cos_sim_prob = torch.softmax(cos_sim, dim=-1) + ner_prob_1
-
-        path = torch.argmax(cos_sim_prob, dim=-1).to('cpu').tolist()
+        cos_sim_prob = torch.softmax(cos_sim+new, dim=-1)
+        value, path = torch.max(cos_sim_prob, dim=-1)
+        path = path.to('cpu').tolist()
         return {'path': path,
                 'output': cos_sim_prob,
                 'ner_prob': ner_prob,
@@ -99,7 +101,7 @@ class NerTr(torch.nn.Module):
             for i in range(torch.max(indices) + 1):
                 grouped_bert_embedding.append(last_hidden_state_real_word
                                                  [indices == i])
-            grouped_bert_embedding_avg = [torch.mean(v, dim=0)
+            grouped_bert_embedding_avg = [torch.max(v, dim=0)
                                           for v in grouped_bert_embedding]
             bert_feature_bulk.append(torch.stack(grouped_bert_embedding_avg))
 

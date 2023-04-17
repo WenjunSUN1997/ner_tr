@@ -8,12 +8,12 @@ class NerDetector(torch.nn.Module):
                                             num_layers=1,
                                             batch_first=True,
                                             bidirectional=True)
-        self.linear = torch.nn.Linear(in_features=sim_dim*2, out_features=num_ner)
+        self.linear = torch.nn.Linear(in_features=sim_dim, out_features=num_ner)
 
     def forward(self, data):
         bert_feature = self.get_bert_feature_first(data)
-        output_bilstm = self.bilstm(bert_feature)[0]
-        prob = self.linear(output_bilstm)
+        #output_bilstm = self.bilstm(bert_feature)[0]
+        prob = self.linear(bert_feature)
         prob = torch.softmax(prob, dim=-1)
         path = torch.argmax(prob, dim=-1).to('cpu').tolist()
         return {'path': path,

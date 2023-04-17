@@ -17,6 +17,7 @@ def validate(dataloader, model, ann_type, index_out,
             ouput = model(data)
         except:
             continue
+
         prediction = ouput['path']
         label = data['label_'+ann_type]
         loss_ce = loss_func(ouput['output'].view(-1, num_ner),
