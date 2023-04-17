@@ -71,7 +71,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                   patience=3,
                                   verbose=True)
     weight_ner = torch.ones(num_ner)
-    weight_ner[0] = 0.1
+    weight_ner[0] = 3.0
     loss_func = torch.nn.CrossEntropyLoss(weight=weight_ner.to(device))
     weight = torch.tensor([8., 1.])
     loss_func_ner = torch.nn.CrossEntropyLoss()
