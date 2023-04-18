@@ -50,20 +50,13 @@ class NerTr(torch.nn.Module):
             bert_feature = bert_feature['last_hidden_state']
 
         output_encoder = self.encoder(bert_feature)
-        output_bilstm = self.bilstm(bert_feature)[0]
-        #ner_prob = torch.softmax(self.linear(output_bilstm), dim=-1)
-        ner_prob = torch.softmax(self.linear(self.activation(output_bilstm)), dim=-1)
-        ner_prob_1 = ner_prob[:, :, 1:2].repeat(1, 1, 8)
-        ner_prob_0 = ner_prob[:, :, 0:1].repeat(1, 1, 1)
-        new = torch.cat([ner_prob_0, ner_prob_1], dim=-1)
         input_decoder = self.normalize(output_encoder)
         decoder_embedding, cos_sim = self.decoder(input_decoder)
-        cos_sim_prob = torch.softmax(cos_sim+new, dim=-1)
+        cos_sim_prob = torch.softmax(cos_sim, dim=-1)
         value, path = torch.max(cos_sim_prob, dim=-1)
         path = path.to('cpu').tolist()
         return {'path': path,
                 'output': cos_sim_prob,
-                'ner_prob': ner_prob,
                 }
 
     def prob_times_query(self, cos_sim_prob, decoder_embedding):

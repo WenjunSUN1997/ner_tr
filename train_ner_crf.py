@@ -48,8 +48,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                            device=device,
                            alignment=alignment,
                            concatenate=concatenate)
-    pretrained_dict = torch.load('model_zoo/conll_111_78.07.pth')
-    ner_crf_model.load_state_dict(pretrained_dict, strict=False)
+    # pretrained_dict = torch.load('model_zoo/conll_111_78.07.pth')
+    # ner_crf_model.load_state_dict(pretrained_dict, strict=False)
     for name, param in ner_crf_model.named_parameters():
         if 'crf' not in name:
             param.requires_grad = False

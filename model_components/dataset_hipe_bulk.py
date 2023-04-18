@@ -11,12 +11,7 @@ class TextDatasetBulk(torch.utils.data.Dataset):
                  tokenizer_name, max_len_tokens, goal, model_type):
         super(TextDatasetBulk, self).__init__()
         self.model_type = model_type
-        self.words_raw = [item for sublist in csv['words'] for item in literal_eval(sublist)]
-        self.words = []
-        for token in self.words_raw:
-            if token != '¬':
-                self.words.append(token.replace('¬', ''))
-
+        self.words = [item for sublist in csv['words'] for item in literal_eval(sublist)]
         self.ner_c = [item for sublist in csv['ner_c'] for item in literal_eval(sublist)]
         self.ner_f = [item for sublist in csv['ner_f'] for item in literal_eval(sublist)]
         self.window_len = window_len
@@ -46,11 +41,6 @@ class TextDatasetBulk(torch.utils.data.Dataset):
         ner_f_bulk = self.split_list(self.ner_f, padding=0)
         if self.goal == 'train':
             del_index = []
-            # for index in range(len(ner_c_bulk)):
-            #     if ner_c_bulk[index][0] != 0\
-            #             or ner_c_bulk[index][-1] != 0 \
-            #             or sum(ner_c_bulk[index])==0:
-            #         del_index.append(index)
             words_bulk = [words_bulk[i] for i in range(len(words_bulk))
                           if i not in del_index]
             ner_c_bulk = [ner_c_bulk[i] for i in range(len(ner_c_bulk))
