@@ -5,6 +5,7 @@ import pandas as pd
 from transformers import BertModel, LlamaTokenizer, AutoTokenizer
 from tqdm import tqdm
 from datasets import load_dataset
+from tqdm import tqdm
 
 def data_preprocess(data, bert, max_len_token=618):
     '''
@@ -42,26 +43,26 @@ def data_augmentation():
     words = []
     ner_c = []
     ner_f = []
-    with open('../data/wikiner_en_1', 'r', encoding="utf8") as file:
+    with open('../data/wikiner_fr', 'r', encoding="utf8") as file:
         text_1 = file.read()
-    with open('../data/wikiner_en_2', 'r', encoding="utf8") as file:
-        text_2 = file.read()
+    # with open('../data/wikiner_en_2', 'r', encoding="utf8") as file:
+    #     text_2 = file.read()
 
-    text = text_1 + text_2
+    text = text_1
     text = text.replace('\n', ' ')
     text = text.split(' ')
     text = [x for x in text if x != '']
-    for text_cell in text:
-        print(text_cell)
+    for text_cell in tqdm(text):
+        # print(text_cell)
         token, _, tag = text_cell.split('|')
         words.append(token)
         ner_c.append(tag_dict[tag])
         ner_f.append(tag_dict[tag])
 
-    df = pd.read_csv('../data/train_conll2003.csv')
+    df = pd.read_csv('../data/train_fr.csv')
     a = df.append({'words': words, 'ner_c': ner_c, 'ner_f': ner_f}, ignore_index=True)
     a.reset_index(drop=True)
-    a.to_csv('../data/train_conll_augmentation.csv')
+    a.to_csv('../data/train_fr_augmentation.csv')
 
 
 

@@ -2,5 +2,6 @@ model_zoo/*
 data/train_conll_augmentation.csv
 data/wikiner_en_1
 data/wikiner_en_2
+data/train_fr_augmentation.csv
 
 

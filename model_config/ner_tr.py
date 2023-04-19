@@ -5,7 +5,8 @@ from model_config.decoder import NerTrDecoder
 class NerTr(torch.nn.Module):
     def __init__(self, bert_model, sim_dim,
                  num_ner, ann_type, device,
-                 alignment, concatenate):
+                 alignment, concatenate,
+                 num_encoder):
         '''
         :param bert_model: the huggingface bert model
         :param sim_dim: the dimention of the bert model like 768
@@ -19,19 +20,15 @@ class NerTr(torch.nn.Module):
         self.sim_dim = sim_dim
         self.alignment = alignment
         self.bert_model = bert_model
-        self.encoder = NerTrEncoder(sim_dim=sim_dim)
+        self.encoder = torch.nn.ModuleList()
+        for encoder_index in range(num_encoder):
+            self.encoder.append(NerTrEncoder(sim_dim=sim_dim))
+
         self.decoder = NerTrDecoder(num_ner=num_ner,
-                                    sim_dim=sim_dim,
+                                    sim_dim=sim_dim * num_encoder,
                                     device=self.device)
-        self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim)
-        self.bilstm = torch.nn.LSTM(sim_dim, sim_dim,
-                                    num_layers=1,
-                                    batch_first=True,
-                                    bidirectional=True)
-        self.linear = torch.nn.Linear(in_features=sim_dim * 2, out_features=2)
+        self.normalize = torch.nn.LayerNorm(normalized_shape=sim_dim * num_encoder)
         self.activation = torch.nn.ReLU()
-        self.normalize_embedding_with_prob_query = \
-            torch.nn.LayerNorm(normalized_shape=sim_dim*2)
 
     def forward(self, data):
         '''
@@ -49,8 +46,9 @@ class NerTr(torch.nn.Module):
                                            attention_mask=data['attention_mask_bert'])
             bert_feature = bert_feature['last_hidden_state']
 
-        output_encoder = self.encoder(bert_feature)
-        input_decoder = self.normalize(output_encoder)
+        output_encoder = [encoder(bert_feature) for encoder in self.encoder]
+        input_decoder = torch.cat(output_encoder, dim=-1)
+        input_decoder = self.normalize(input_decoder)
         decoder_embedding, cos_sim = self.decoder(input_decoder)
         cos_sim_prob = torch.softmax(cos_sim, dim=-1)
         value, path = torch.max(cos_sim_prob, dim=-1)

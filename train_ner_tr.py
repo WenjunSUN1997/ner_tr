@@ -13,7 +13,7 @@ torch.manual_seed(3407)
 
 def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
           bert_model_name, num_ner, ann_type, sim_dim, device, batch_size, alignment,
-          concatenate, model_type, weight_o, train_bert):
+          concatenate, model_type, weight_o, train_bert, data_aug, num_encoder):
     LR = 2e-5
     epoch = 10000
 
@@ -25,7 +25,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                       batch_size=batch_size,
                                       device=device,
                                       num_ner=num_ner,
-                                      model_type=model_type)
+                                      model_type=model_type,
+                                      data_aug=data_aug)
     dataloader_dev = get_dataloader(lang=lang, goal='dev',
                                     window_len=window_len,
                                     step_len=window_len,
@@ -34,7 +35,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                     batch_size=batch_size,
                                     device=device,
                                     num_ner=num_ner,
-                                    model_type=model_type)
+                                    model_type=model_type,
+                                    data_aug=data_aug)
     dataloader_test = get_dataloader(lang=lang, goal='test',
                                      window_len=window_len,
                                      step_len=window_len,
@@ -43,7 +45,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                      batch_size=batch_size,
                                      device=device,
                                      num_ner=num_ner,
-                                     model_type=model_type)
+                                     model_type=model_type,
+                                     data_aug=data_aug)
 
     bert_model = BertModel.from_pretrained(bert_model_name)
     if model_type == 'ner_tr':
@@ -53,7 +56,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                           ann_type=ann_type,
                           device=device,
                           alignment=alignment,
-                          concatenate=concatenate)
+                          concatenate=concatenate,
+                          num_encoder=num_encoder)
     elif model_type == 'detector':
         ner_model = NerDetector(bert_model=bert_model,
                                 sim_dim=sim_dim,
@@ -85,10 +89,10 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            if (step+1) % 4000 == 0:
+            if (step+1) % 1000 == 0:
                 print(epoch_num)
                 print('dev:')
-                loss_dev = validate(model=ner_model,
+                output_dev = validate(model=ner_model,
                                     dataloader=dataloader_dev,
                                     num_ner=num_ner,
                                     ann_type=ann_type,
@@ -97,6 +101,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
                                     epoch_num=epoch_num,
                                     model_type=model_type,
                                     loss_func=loss_func)
+                scheduler.step(output_dev['loss_ce'])
 
         loss_epoch = sum(loss_all) / len(loss_all)
         print(loss_epoch)
@@ -131,8 +136,10 @@ if __name__ == "__main__":
     parser.add_argument("--device", default='cuda:0')
     parser.add_argument("--batch_size", default=2)
     parser.add_argument("--index_out", default=0)
+    parser.add_argument("--data_aug", default=0)
+    parser.add_argument("--num_encoder", default=2)
     parser.add_argument("--weight_o", default=10.0)
-    parser.add_argument("--train_bert", default='1')
+    parser.add_argument("--train_bert", default='0')
     parser.add_argument("--model_type", default='ner_tr', choices=['ner_tr', 'detector'])
     args = parser.parse_args()
     print(args)
@@ -141,6 +148,7 @@ if __name__ == "__main__":
     weight_o = float(args.weight_o)
     concatenate = args.concatenate
     train_bert = True if args.train_bert == '1' else False
+    data_aug = True if args.data_aug == '1' else False
     index_out = int(args.index_out)
     batch_size = int(args.batch_size)
     window_len = int(args.window_len)
@@ -151,6 +159,7 @@ if __name__ == "__main__":
     num_ner = int(args.num_ner)
     ann_type = args.ann_type
     sim_dim = int(args.sim_dim)
+    num_encoder = int(args.num_encoder)
     model_type = args.model_type
     device = args.device
     train(lang=lang,
@@ -169,4 +178,6 @@ if __name__ == "__main__":
           concatenate=concatenate,
           model_type=model_type,
           weight_o=weight_o,
-          train_bert=train_bert)
+          train_bert=train_bert,
+          data_aug=data_aug,
+          num_encoder=num_encoder)

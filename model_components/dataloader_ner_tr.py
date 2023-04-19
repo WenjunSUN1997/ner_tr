@@ -3,20 +3,24 @@ from model_components.dataset_hipe_bulk import TextDatasetBulk, TextDatasetBulkB
 import pandas as pd
 
 def get_dataloader(lang, goal, window_len, step_len, max_len_tokens,
-                   tokenizer_name, batch_size, device, num_ner, model_type):
-    file_path_dict = {'fre':{'train':'data/train_fr.csv',
-                             'test':'data/test_fr.csv',
-                             'dev':'data/dev_fr.csv'},
+                   tokenizer_name, batch_size, device, num_ner, model_type,
+                   data_aug):
+    file_path_dict = {'fre': {'train': 'data/train_fr.csv',
+                              'test': 'data/test_fr.csv',
+                              'dev': 'data/test_fr.csv'},
                       'wnut': {'train': 'data/train_wnut_17.csv',
-                              'test': 'data/test_wnut_17.csv',
-                              'dev': 'data/test_wnut_17.csv'},
+                               'test': 'data/test_wnut_17.csv',
+                               'dev': 'data/test_wnut_17.csv'},
                       'conll': {'train': 'data/train_conll2003.csv',
-                               'test': 'data/test_conll2003.csv',
-                               'dev': 'data/test_conll2003.csv'},
-                      'conll_au': {'train': 'data/train_conll_augmentation.csv',
                                 'test': 'data/test_conll2003.csv',
                                 'dev': 'data/test_conll2003.csv'},
+                      'conll_au': {'train': 'data/train_conll_augmentation.csv',
+                                   'test': 'data/test_conll2003.csv',
+                                   'dev': 'data/test_conll2003.csv'},
                       }
+    if data_aug:
+        file_path_dict['fre']['train'] = 'data/train_fr_augmentation.csv'
+
     csv = pd.read_csv(file_path_dict[lang][goal])
 
     if goal == 'train' and model_type == 'detector':
