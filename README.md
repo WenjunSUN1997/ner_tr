@@ -2,10 +2,11 @@
 Finally someone is watching, I thought we could all communicate telepathically, but the reality is harsh.
 But, since you asked in good faith, I'll answer you properly!
 
-![屏幕截图 2023-04-27 173926](https://user-images.githubusercontent.com/20592128/234914179-97f6b044-c329-492f-95f3-25132dc1ce55.png)
 
-first trans your data into this format:
-words, ner_c, ner_f
+![屏幕截图 2023-04-27 174803](https://user-images.githubusercontent.com/20592128/234916412-d5b3bac4-ec49-4e97-8ccc-19381e64b682.png)
+
+first trans your data into this format:  
+words, ner_c, ner_f  
 ['a', ...], [0,1,2...], [0,1,2...]
 
 then add your data into /data/ 
