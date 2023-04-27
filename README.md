@@ -1,5 +1,5 @@
 # ner_tr
-Finally someone is watching, I thought we could all communicate telepathically, but the reality is harsh.
+Finally someone is watching, I thought we could all communicate telepathically, but the reality is harsh.  
 But, since you asked in good faith, I'll answer you properly!
 
 
