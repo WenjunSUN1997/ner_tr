@@ -13,7 +13,7 @@ then add your data into /data/
 Register your dataset in model/components/dataloader_ner_tr.py and train_ner_tr.py (--lang)  
 Run  
 
-python -u train_ner_tr.py 
+python -u train_ner_tr.py  
 --lang sv   
 --train_bert 1   
 --num_encoder 1   
