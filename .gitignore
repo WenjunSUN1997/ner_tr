@@ -3,5 +3,10 @@ data/train_conll_augmentation.csv
 data/wikiner_en_1
 data/wikiner_en_2
 data/train_fr_augmentation.csv
-
-
+data/PhoNER_COVID19
+.ipynb_checkpoints/
+data/.ipynb_checkpoints/
+model_components/.ipynb_checkpoints/
+model_components/__pycache__/*
+model_config/.ipynb_checkpoints/
+model_config/__pycache__/*

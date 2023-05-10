@@ -1,0 +1,1 @@
+python -u train_ner_tr.py  --lang phoner  --train_bert 1   --num_encoder 1  --weight_o 15   --sim_dim 768   --batch_size 4   --step_len 50   --window_len 50   --max_len_tokens 190   --data_aug 0   --device cuda:0  --bert_model_name vinai/phobert-base  --model_type ner_tr   --num_ner 21   --sim_dim 768  --ann_type croase
