@@ -2,7 +2,7 @@ import torch
 from transformers import AutoTokenizer, BertModel, BertConfig
 
 class NerTrDecoder(torch.nn.Module):
-    def __init__(self, num_ner, sim_dim, device, bert_name='vinai/phobert-base'):
+    def __init__(self, num_ner, sim_dim, device, bert_name='bert-base-multilingual-uncased'):
         super(NerTrDecoder, self).__init__()
         self.num_ner = num_ner
         self.device = device

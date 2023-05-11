@@ -121,7 +121,7 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--lang", default='fre', choices=['fre', 'wnut', 'conll',
-                                                          'conll_au', 'phoner'])
+                                                          'conll_au', 'phoner','en_ate'])
     parser.add_argument("--window_len", default=100)
     parser.add_argument("--step_len", default=100)
     parser.add_argument("--max_len_tokens", default=400)

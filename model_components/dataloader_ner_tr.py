@@ -20,6 +20,9 @@ def get_dataloader(lang, goal, window_len, step_len, max_len_tokens,
                       'phoner': {'train': 'data/train_syllable_vi.csv',
                                    'test': 'data/dev_syllable_vi.csv',
                                    'dev': 'data/test_syllable_vi.csv'},
+                      'en_ate': {'train': 'data/ate/en/en_ann_corp.csv',
+                                   'test': 'data/ate/en/en_ann_equi.csv',
+                                   'dev': 'data/ate/en/en_ann_htfl.csv'},
                       }
     if data_aug:
         file_path_dict['fre']['train'] = 'data/train_fr_augmentation.csv'
