@@ -64,7 +64,9 @@ def data_augmentation():
     a.reset_index(drop=True)
     a.to_csv('../data/train_fr_augmentation.csv')
 
+def create_gt():
 
+    pass
 
 
 
