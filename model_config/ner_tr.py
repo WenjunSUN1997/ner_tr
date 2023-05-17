@@ -6,7 +6,8 @@ class NerTr(torch.nn.Module):
     def __init__(self, bert_model, sim_dim,
                  num_ner, ann_type, device,
                  alignment, concatenate,
-                 num_encoder):
+                 num_encoder, encoder_rela,
+                 encoder_bert):
         '''
         :param bert_model: the huggingface bert model
         :param sim_dim: the dimention of the bert model like 768
@@ -15,14 +16,20 @@ class NerTr(torch.nn.Module):
         '''
         super(NerTr, self).__init__()
         self.device = device
+        self.encoder_rela_flag = encoder_rela
+        self.encoder_bert_flag = encoder_bert
         self.concatenate = concatenate
         self.ann_type = ann_type
         self.sim_dim = sim_dim
         self.alignment = alignment
         self.bert_model = bert_model
-        self.encoder = torch.nn.ModuleList()
+        self.encoder_bert = torch.nn.ModuleList()
         for encoder_index in range(num_encoder):
-            self.encoder.append(NerTrEncoder(sim_dim=sim_dim))
+            self.encoder_bert.append(NerTrEncoder(sim_dim=sim_dim))
+
+        self.encoder_rela = torch.nn.ModuleList()
+        for encoder_index in range(num_encoder):
+            self.encoder_rela.append(NerTrEncoder(sim_dim=sim_dim))
 
         self.decoder = NerTrDecoder(num_ner=num_ner,
                                     sim_dim=sim_dim * num_encoder,
@@ -46,8 +53,17 @@ class NerTr(torch.nn.Module):
                                            attention_mask=data['attention_mask_bert'])
             bert_feature = bert_feature['last_hidden_state']
 
-        output_encoder = [encoder(bert_feature) for encoder in self.encoder]
-        input_decoder = torch.cat(output_encoder, dim=-1)
+        if self.encoder_rela_flag:
+            try:
+                output_encoder = [encoder(bert_feature)
+                                  for encoder in self.encoder_rela]
+            except:
+                output_encoder = [encoder(bert_feature.float())
+                                  for encoder in self.encoder_rela]
+            input_decoder = torch.cat(output_encoder, dim=-1)
+        else:
+            input_decoder = bert_feature
+
         input_decoder = self.normalize(input_decoder)
         decoder_embedding, cos_sim = self.decoder(input_decoder)
         cos_sim_prob = torch.softmax(cos_sim, dim=-1)
@@ -110,8 +126,19 @@ class NerTr(torch.nn.Module):
             words_ids = data['words_ids']
 
         output_bert = self.bert_model(input_ids=input_ids,
-                                      attention_mask=attention_mask
+                                      attention_mask=attention_mask,
+                                      output_hidden_states=True,
+                                      return_dict=True
                                       )['last_hidden_state']
+        if self.encoder_bert_flag:
+            try:
+                output_encoder = [encoder(output_bert)
+                                  for encoder in self.encoder_bert]
+            except:
+                output_encoder = [encoder(output_bert.float())
+                                  for encoder in self.encoder_bert]
+            output_bert = torch.cat(output_encoder, dim=-1)
+
         b_s, token_num, sim_dim = output_bert.shape
         result = []
         for b_s_index in range(b_s):
