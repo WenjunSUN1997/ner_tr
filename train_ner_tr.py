@@ -103,7 +103,8 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
         print(epoch_num)
         loss_all = []
         for step, data in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
-            # break
+            # if step >= 3:
+            #     break
             output = ner_model(data)
             if model_type == 'benchmark':
                 loss = output['loss']
@@ -156,22 +157,19 @@ def train(lang, window_len, step_len, max_len_tokens, tokenizer_name, index_out,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-<<<<<<< HEAD
     parser.add_argument("--lang", default='fre', choices=['fre', 'wnut', 'conll',
-                                                          'conll_au', 'phoner','en_ate'])
-=======
-    parser.add_argument("--lang", default='20_en', choices=['fre', 'wnut', 'conll',
-                                                          'conll_au', 'de', 'fi',
-                                                          'sv', 'ajmc_en',
-                                                          'ajmc_fr', 'ajmc_de',
-                                                          '19_en', '20_en'])
->>>>>>> c19f985558ff5f73fcd141d42aa7e25f6280cf35
+                                                            'conll_au', 'de', 'fi',
+                                                            'sv', 'ajmc_en',
+                                                            'ajmc_fr', 'ajmc_de',
+                                                            '19_en', '20_en', 'vi',
+                                                            'ann_en', 'ann_fr', 'ann_nl',
+                                                            'nes_en', 'nes_fr', 'nes_nl',])
     parser.add_argument("--window_len", default=100)
     parser.add_argument("--step_len", default=100)
     parser.add_argument("--max_len_tokens", default=400)
     default_bert = 'dbmdz/bert-base-historic-multilingual-64k-td-cased'
     parser.add_argument("--bert_model_name", default=default_bert)
-    parser.add_argument("--num_ner", default=13)
+    parser.add_argument("--num_ner", default=9)
     parser.add_argument("--alignment", default='first', choices=['avg', 'flow',
                                                                  'max', 'first'])
     parser.add_argument("--concatenate", default='con', choices=['add', 'con'])
@@ -185,7 +183,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_encoder", default=1)
     parser.add_argument("--weight_o", default=10.0)
     parser.add_argument("--train_bert", default='0')
-    parser.add_argument("--model_type", default='ner_tr', choices=['ner_tr',
+    parser.add_argument("--model_type", default='benchmark', choices=['ner_tr',
                                                                    'detector',
                                                                    'benchmark'])
     parser.add_argument("--encoder_bert", default='0')
