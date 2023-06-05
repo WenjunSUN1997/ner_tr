@@ -61,13 +61,17 @@ class TextDatasetBulk(torch.utils.data.Dataset):
         output_tokenizer = self.tokenizer(self.words_bulk[item],
                                           is_split_into_words=True,
                                           padding="max_length",
-                                          max_length=self.max_len_tokens)
+                                          max_length=self.max_len_tokens,
+                                          truncation=True)
         input_ids = output_tokenizer['input_ids']
         attention_mask_bert = output_tokenizer['attention_mask']
         word_ids = [-100 if element is None else element
                     for element in output_tokenizer.word_ids()]
         label_croase = torch.tensor(self.ner_c_bulk[item]).to(self.device)
-        label_fine = torch.tensor(self.ner_f_bulk[item]).to(self.device)
+        try:
+            label_fine = torch.tensor(self.ner_f_bulk[item]).to(self.device)
+        except:
+            label_fine = torch.tensor(self.ner_c_bulk[item]).to(self.device)
         if self.model_type == 'detector':
             label_croase[label_croase != 0] = 1
             label_fine[label_fine != 0] = 1
@@ -76,7 +80,8 @@ class TextDatasetBulk(torch.utils.data.Dataset):
             'words_ids': torch.tensor(word_ids).to(self.device),
             'attention_mask_bert': torch.tensor(attention_mask_bert).to(self.device),
             'label_croase': label_croase,
-            'label_fine': label_fine
+            'label_fine': label_fine,
+            'original_token': self.words_bulk[item][:max(word_ids)+1]
         }
 
 class TextDatasetBulkByLabel(TextDatasetBulk):
@@ -114,9 +119,10 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
                     indices_1 = [i for i, x in enumerate(target[index])
                                  if x != 0]
                     output_tokenizer = self.tokenizer(self.words_bulk[index],
-                                   is_split_into_words=True,
-                                   padding="max_length",
-                                   max_length=self.max_len_tokens)
+                                                      is_split_into_words=True,
+                                                      padding="max_length",
+                                                      max_length=self.max_len_tokens,
+                                                      truncation=True)
                     self.input_ids[label_index].append(output_tokenizer['input_ids'])
                     self.attention_mask_bert[label_index].append(output_tokenizer[
                                                                      'attention_mask'])
@@ -179,7 +185,7 @@ class TextDatasetBulkByLabel(TextDatasetBulk):
             'label_fine': torch.tensor(label).view(-1).to(self.device),
             'label_detect': torch.tensor([0]+[1]*(self.num_ner-1)).view(-1).to(self.device),
             'attention_mask_bert': attention_mask_bert_tensor,
-            'words_ids_detect': words_ids_detect_tensor
+            'words_ids_detect': words_ids_detect_tensor,
             # 'label_fine': label_fine
         }
 
