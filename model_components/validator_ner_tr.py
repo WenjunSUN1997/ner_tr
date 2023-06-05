@@ -13,7 +13,11 @@ def validate(dataloader, model, ann_type, index_out,
     label_all = []
     prediction_all = []
     loss_all_ce = []
+    tokens = []
     for step, data in tqdm(enumerate(dataloader), total=len(dataloader)):
+        batch_size = data['input_ids'].shape[0]
+        for batch_size_index in range(batch_size):
+            tokens += [x[batch_size_index] for x in data['original_token']]
         ouput = model(data)
         prediction = ouput['path']
         label = data['label_'+ann_type]
@@ -30,12 +34,20 @@ def validate(dataloader, model, ann_type, index_out,
             label_cell = label[b_s_index].to('cpu').tolist()
             label_all += label_cell
             prediction_all += prediction_cell
+    if 'ann' in lang or 'nes' in lang:
+        extracted_terms = get_term(label_list=prediction_all, token_list=tokens)
+        truth = get_term(label_list=label_all, token_list=tokens)
+        p, r, f = computeTermEvalMetrics(extracted_terms=extracted_terms,
+                                         gold_df=truth)
+        record_term(extracted_terms=extracted_terms, gold_df=truth,
+                    f=f, lang=lang, epoch_num=epoch_num)
 
-    p = precision_score(y_true=label_all, y_pred=prediction_all,
-                        average='micro', labels=labels_to_cal)
-    r = recall_score(y_true=label_all, y_pred=prediction_all,
-                     average='micro', labels=labels_to_cal)
-    f = f1_score(y_true=label_all, y_pred=prediction_all,
+    else:
+        p = precision_score(y_true=label_all, y_pred=prediction_all,
+                            average='micro', labels=labels_to_cal)
+        r = recall_score(y_true=label_all, y_pred=prediction_all,
+                         average='micro', labels=labels_to_cal)
+        f = f1_score(y_true=label_all, y_pred=prediction_all,
                  average='micro', labels=labels_to_cal)
     c_m = confusion_matrix(label_all, prediction_all)
     print('p', p)
@@ -96,8 +108,48 @@ def convert_tsv(lang, prediction_all, epoch_num, f):
         os.makedirs('log/'+lang)
 
     gt.to_csv('log/' + lang + '/' + lang + '_' + str(epoch_num)
-              + '_' +str(round(f * 100, 2)) + '.tsv',
+              + '_' + str(round(f * 100, 2)) + '.tsv',
               index=False)
+
+def get_term(label_list, token_list):
+    term_list = []
+    for index in range(len(label_list)):
+        term = ''
+        if label_list[index] == 1:
+            term += token_list[index]
+            for index_2 in range(index+1, len(label_list)):
+                if label_list[index_2] == 2:
+                    term += token_list[index_2] + ' '
+                else:
+                    break
+        term_list.append(term)
+
+    return set(term_list)
+
+def computeTermEvalMetrics(extracted_terms, gold_df):
+    #make lower case cause gold standard is lower case
+    extracted_terms = set([item.lower() for item in extracted_terms])
+    gold_set = set(gold_df)
+    true_pos = extracted_terms.intersection(gold_set)
+    recall = round(len(true_pos)*100/len(gold_set),2)
+    precision = round(len(true_pos)*100/len(extracted_terms),2)
+    fscore = round(2*(precision*recall)/(precision+recall),2)
+    return precision, recall, fscore
+
+def record_term(extracted_terms, gold_df, f, lang, epoch_num):
+    folder = os.path.exists('log/' + lang)
+    if not folder:
+        os.makedirs('log/' + lang)
+
+    with open('log/' + lang + '/' + lang + '_' + str(epoch_num)
+              + '_' + str(round(f * 100, 2)) + '.txt', 'w') as file:
+        for v in extracted_terms:
+            file.write(str(v) + '\n')
+
+    with open('log/' + lang + '/' + lang + '_gold.txt', 'w') as file:
+        for v in gold_df:
+            file.write(str(v) + '\n')
+
 
 
 
