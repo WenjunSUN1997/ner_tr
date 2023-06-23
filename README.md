@@ -1,8 +1,8 @@
-#  LIT: Label-Informed Transformers on Token- and Sequence-based Classification
+#  :fire: LIT :fire: : Label-Informed Transformers on Token- and Sequence-based Classification
 
 ## 1. Description
 
-In this repo, we applied Transformer structure to acieve token-level and sequence-level classification.
+In this repo, we propose LIT, an end-to-end pipeline architecture that integrates Transformer's Encoder-Decoder mechanism with an additional label semantic similarity to token-based classification tasks (i.e., historical Named Entity Recognition (NER), Automatic Term Extraction (ATE)) as well as sequence-based classification tasks (i.e., Sentiment Analysis).
 
 ---
 
@@ -16,17 +16,18 @@ pip install -r requirements.txt
 
 ## 3. Data
 
-First trans your data into .csv file in this format:
+First trans your data into a .csv file in this format:
+```
 words, ner_c, ner_f
 ['a', ...], [0,1,2...], [0,1,2...]
-
+```
 Then add data into /data/
 Register the dataset in model/components/dataloader_ner_tr.py and train_ner_tr.py (--lang)
 
 ## 4. Implementation
 
-Run
-
+Run the following command to train the model.
+```python
 python -u train_ner_tr.py
 --lang sv
 --train_bert 1
@@ -44,7 +45,7 @@ python -u train_ner_tr.py
 --num_ner 13
 --sim_dim 768
 --ann_type croase
-
+```
 ## 5. Results
 
 The full results are available later in our paper.
