@@ -36,10 +36,10 @@ python -u train_ner_tr.py
 --sim_dim 768
 --batch_size 4
 --step_len 50
---window_len 50
---max_len_tokens 190
+--window_len 100
+--max_len_tokens 300
 --data_aug 0
---device cuda:3
+--device cuda:0
 --bert_model_name (sv->peanutacake/autotrain-historic-sv-51079121359, fi->peanutacake/autotrain-historic-fi-51081121368)
 --model_type ner_tr
 --num_ner 13
